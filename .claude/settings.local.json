@@ -3,7 +3,8 @@
     "allow": [
       "Bash(pip install:*)",
       "Bash(python:*)",
-      "Bash(copy main.py pipeline.py)"
+      "Bash(copy main.py pipeline.py)",
+      "Bash(dir:*)"
     ],
     "deny": [],
     "ask": []

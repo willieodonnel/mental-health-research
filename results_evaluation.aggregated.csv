@@ -1,0 +1,3 @@
+judge,Active Listening,Empathy & Validation,Safety & Trustworthiness,Open-mindedness & Non-judgment,Clarity & Encouragement,Boundaries & Ethical,Holistic Approach,overall_mean
+gpt4-turbo,6.600 (std=2.267),8.350 (std=1.558),7.950 (std=0.973),8.450 (std=0.669),7.650 (std=1.851),7.050 (std=2.085),6.450 (std=2.247),7.500
+combined,6.600 (std=2.267),8.350 (std=1.558),7.950 (std=0.973),8.450 (std=0.669),7.650 (std=1.851),7.050 (std=2.085),6.450 (std=2.247),7.500

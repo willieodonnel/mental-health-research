@@ -35,6 +35,12 @@ def append_memory(new_memory):
     with open(MEMORY_FILE, "a", encoding="utf-8") as f:
         f.write(new_memory + "\n")
 
+def clear_memory():
+    """Clear all memory from memory.txt (use when starting with a new person)"""
+    ensure_memory_file()
+    with open(MEMORY_FILE, "w", encoding="utf-8") as f:
+        f.write("")
+
 def invoke_with_retry(chain, inputs, max_retries=5):
     """
     Invoke a chain with retry logic for rate limit errors.
