@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip install:*)",
+      "Bash(python:*)",
+      "Bash(copy main.py pipeline.py)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
