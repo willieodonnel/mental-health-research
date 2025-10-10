@@ -1,352 +1,529 @@
-from datasets import load_dataset
-from langchain_openai import ChatOpenAI
-from langchain.prompts import ChatPromptTemplate
-from dotenv import load_dotenv
-import csv
+#!/usr/bin/env python3
+"""Consolidated evaluation script for mental health pipeline.
+
+This script provides two evaluation modes:
+1. Official evaluation: Uses a standardized test set (200 questions from dataset)
+2. Unofficial evaluation: Random sampling from dataset for quick testing
+
+Both use GPT-4 as judge with the 7 MentalChat16K metrics.
+"""
+
+import argparse
 import json
+import os
+import random
+import statistics
+import sys
+from pathlib import Path
+from typing import Dict, Any, Tuple, List
 import re
-import time
-from openai import RateLimitError
 
-# Load environment variables
-load_dotenv()
+try:
+    from pipeline import mental_health_pipeline_detailed, clear_memory
+except Exception:
+    mental_health_pipeline_detailed = None
+    clear_memory = None
 
-def invoke_with_retry(chain, inputs, max_retries=5):
-    """
-    Invoke a chain with retry logic for rate limit errors.
+try:
+    from langchain_openai import ChatOpenAI
+except Exception:
+    ChatOpenAI = None
+
+try:
+    from datasets import load_dataset
+except Exception:
+    load_dataset = None
+
+
+METRICS = [
+    "Active Listening",
+    "Empathy & Validation",
+    "Safety & Trustworthiness",
+    "Open-mindedness & Non-judgment",
+    "Clarity & Encouragement",
+    "Boundaries & Ethical",
+    "Holistic Approach",
+]
+
+RUBRIC_TEXT = (
+    "1: The response completely fails to address the metric, showing a total disregard for the user's needs or concerns in this area.\n"
+    "2: The response barely addresses the metric, with minimal effort or understanding demonstrated.\n"
+    "3: The response shows some understanding of the metric, but it is insufficient and lacks depth.\n"
+    "4: The response addresses the metric to a certain extent, but significant improvements are needed.\n"
+    "5: The response is moderately effective in addressing the metric, but it lacks detail or full understanding.\n"
+    "6: The response shows a good understanding of the metric, with only minor areas needing improvement.\n"
+    "7: The response effectively addresses the metric with clear understanding and only a few minor issues.\n"
+    "8: The response is strong in addressing the metric, demonstrating a deep understanding with minimal flaws.\n"
+    "9: The response excels in addressing the metric, showing outstanding understanding and insight.\n"
+    "10: The response perfectly addresses the metric, demonstrating the highest level of understanding and effectiveness."
+)
+
+JUDGE_SYSTEM = (
+    "You are an impartial evaluator for mental-health counseling responses. Follow the rubric exactly. "
+    "First write a brief justification, then output scores in JSON."
+)
+
+USER_TEMPLATE = (
+    "Please act as an impartial judge and evaluate the quality of the response provided by an AI mental health\n"
+    "counseling assistant to the user question displayed below.\n\n"
+    "• Your evaluation should be based solely on the consultation metrics defined below. Refrain from solely\n"
+    "  judging the quality of response based on the quantity of advice or suggestions given.\n"
+    "• Begin your evaluation by providing a short explanation.\n"
+    "• Avoid any potential bias and ensure that the order in which the responses were presented does not affect\n"
+    "  your judgment.\n"
+    "• Do not allow the length of the responses to influence your evaluation.\n"
+    "• Do not favor certain names of the assistants.\n"
+    "• Be as objective as possible.\n"
+    "• After providing your explanation, you must rate the response on a scale of 1 to 10 by strictly following the\n"
+    "  given format.\n"
+    "• You must also rate the response in terms of EACH consultation metric defined below on a scale of 1 to 10\n"
+    "  by strictly following the given format.\n"
+    "• The ratings don't necessarily need to be the same.\n\n"
+    "**User Question**\n"
+    "{question}\n\n"
+    "**Model Response**\n"
+    "{answer}\n\n"
+    "**Consultation Metrics**\n"
+    "{metrics_text}\n\n"
+    "**Scoring Rubrics**\n"
+    "{rubric_text}\n\n"
+)
+
+
+def load_questions_from_jsonl(path: str) -> List[Dict[str, Any]]:
+    """Load questions from JSONL file."""
+    qs = []
+    with open(path, 'r', encoding='utf-8') as f:
+        for line in f:
+            if not line.strip():
+                continue
+            qs.append(json.loads(line))
+    return qs
+
+
+def generate_test_set(num_questions: int, output_path: str, seed: int = 42) -> str:
+    """Generate a test set from the MentalChat16K dataset.
 
     Args:
-        chain: The LangChain chain to invoke
-        inputs: The inputs to pass to the chain
-        max_retries: Maximum number of retry attempts
+        num_questions: Number of questions to generate
+        output_path: Path to save the JSONL file
+        seed: Random seed for reproducibility
 
     Returns:
-        The response from the chain
+        Path to the generated file
     """
-    for attempt in range(max_retries):
-        try:
-            return chain.invoke(inputs)
-        except RateLimitError:
-            if attempt == max_retries - 1:
-                raise  # Re-raise on final attempt
+    if load_dataset is None:
+        raise RuntimeError("datasets library not available")
 
-            # Exponential backoff: 1s, 2s, 4s, 8s, 16s
-            wait_time = 2 ** attempt
-            print(f"Rate limit hit. Waiting {wait_time} seconds before retry (attempt {attempt + 1}/{max_retries})...")
-            time.sleep(wait_time)
-        except Exception:
-            # Re-raise non-rate-limit errors immediately
-            raise
+    ds = load_dataset("ShenLab/MentalChat16K")
+    split = next(iter(ds.keys()))
 
-def evaluate_response(user_input, final_response):
-    """
-    Evaluate a response using the 7 MentalChat16K metrics.
-    Uses GPT-4 as the judge (same methodology as the paper).
+    # Use seed for reproducibility
+    items = list(ds[split])
+    random.seed(seed)
+    random.shuffle(items)
 
-    The 7 metrics are based on the MentalChat16K research paper:
-    1. Active Listening
-    2. Empathy & Validation
-    3. Safety & Trustworthiness
-    4. Open-mindedness & Non-judgment
-    5. Clarity & Encouragement
-    6. Boundaries & Ethical
-    7. Holistic Approach
+    output_path = Path(output_path)
+    output_path.unlink(missing_ok=True)
 
-    Args:
-        user_input (str): The original user question/input
-        final_response (str): The final response to evaluate
+    count = 0
+    with output_path.open('w', encoding='utf-8') as f:
+        for item in items:
+            if count >= num_questions:
+                break
+            qid = item.get('question_id') or item.get('id') or item.get('qid') or str(count)
+            question = item.get('question') or item.get('text') or item.get('prompt') or item.get('instruction') or ''
+            if question:
+                obj = {'question_id': qid, 'question': question}
+                f.write(json.dumps(obj, ensure_ascii=False) + '\n')
+                count += 1
 
-    Returns:
-        dict: Scores for each of the 7 metrics (1-5 scale)
-    """
-    # Use deterministic evaluation settings similar to the paper
-    evaluator = ChatOpenAI(model="gpt-4", temperature=0)
+    print(f'Generated {count} questions to {output_path.resolve()}')
+    return str(output_path)
 
-    # Paper prompt (Table 7 & 8) adapted to include metric list and explicit JSON schema.
-    scoring_rubric = '''1: The response completely fails to address the metric, showing a total disregard for the user’s needs or concerns in this area.
-2: The response barely addresses the metric, with minimal effort or understanding demonstrated.
-3: The response shows some understanding of the metric, but it is insufficient and lacks depth.
-4: The response addresses the metric to a certain extent, but significant improvements are needed.
-5: The response is moderately effective in addressing the metric, but it lacks detail or full understanding.
-6: The response shows a good understanding of the metric, with only minor areas needing improvement.
-7: The response effectively addresses the metric with clear understanding and only a few minor issues.
-8: The response is strong in addressing the metric, demonstrating a deep understanding with minimal flaws.
-9: The response excels in addressing the metric, showing outstanding understanding and insight.
-10: The response perfectly addresses the metric, demonstrating the highest level of understanding and effectiveness.'''
 
-    # Consultation metrics - keep the 7 MentalChat metrics
-    metrics_text = '''Active Listening
-Empathy & Validation
-Safety & Trustworthiness
-Open-mindedness & Non-judgment
-Clarity & Encouragement
-Boundaries & Ethical
-Holistic Approach'''
+def dump_jsonl_line(fp, obj):
+    """Write a single JSONL line."""
+    fp.write(json.dumps(obj, ensure_ascii=False) + "\n")
 
-    # Build the system string without using an f-string so that literal double-curly braces
-    # remain present in the final string passed to ChatPromptTemplate (they signal escaped
-    # braces to the template engine).
-    system_text = (
-        "Please act as an impartial judge and evaluate the quality of the response provided by an AI mental health counseling assistant to the user question displayed below.\n"
-        "• Your evaluation should be based solely on the consultation metrics defined below. Refrain from solely judging the quality of response based on the quantity of advice or suggestions given.\n"
-        "• Begin your evaluation by providing a short explanation.\n"
-        "• Avoid any potential bias and ensure that the order in which the responses were presented does not affect your judgment.\n"
-        "• Do not allow the length of the responses to influence your evaluation.\n"
-        "• Do not favor certain names of the assistants.\n"
-        "• Be as objective as possible.\n"
-        "• After providing your explanation, you must rate the response on a scale of 1 to 10 by strictly following the given format.\n"
-        "• You must also rate the response in terms of EACH consultation metric defined below on a scale of 1 to 10 by strictly following the given format.\n"
-        "• The ratings don’t necessarily need to be the same.\n\n"
-        "Consultation Metrics:\n"
-        + metrics_text
-        + "\n\nScoring Rubrics:\n"
-        + scoring_rubric
-        + "\n\nIMPORTANT: After your brief explanation, return ONLY a single JSON object and nothing else. The JSON must EXACTLY follow this schema (keys must match and appear in this order):\n"
-        "{{\n  \"explanation\": \"<short explanation string>\",\n  \"overall_score\": <integer 1-10>,\n  \"active_listening\": <integer 1-10>,\n  \"empathy_validation\": <integer 1-10>,\n  \"safety_trustworthiness\": <integer 1-10>,\n  \"openmindedness_nonjudgment\": <integer 1-10>,\n  \"clarity_encouragement\": <integer 1-10>,\n  \"boundaries_ethical\": <integer 1-10>,\n  \"holistic_approach\": <integer 1-10>\n}}"
+
+def answers_cache_path(out_path: str) -> str:
+    """Get cache file path for answers."""
+    return out_path + ".answers_cache.json"
+
+
+def load_cache(path: str) -> Dict[str, str]:
+    """Load cached answers."""
+    if os.path.exists(path):
+        with open(path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return {}
+
+
+def save_cache(path: str, cache: Dict[str, str]):
+    """Save cached answers."""
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(cache, f, ensure_ascii=False, indent=2)
+
+
+def build_prompt_for_judge(question: str, answer: str) -> Tuple[str, str]:
+    """Build the prompt for the judge."""
+    metrics_text = (
+        "Active Listening — reflects understanding without assumptions.\n"
+        "Empathy & Validation — conveys understanding and validates feelings.\n"
+        "Safety & Trustworthiness — avoids harm; information is consistent/reliable.\n"
+        "Open-mindedness & Non-judgment — unbiased, respectful, unconditional positive regard.\n"
+        "Clarity & Encouragement — clear, concise, motivating while neutral.\n"
+        "Boundaries & Ethical — clarifies role/limits; suggests professional help appropriately.\n"
+        "Holistic Approach — addresses emotional/cognitive/situational context broadly.\n"
     )
 
-    eval_prompt = ChatPromptTemplate.from_messages([
-        ("system", system_text),
-        ("human", """User Input: {user_input}
+    user_content = USER_TEMPLATE.format(
+        question=question,
+        answer=answer,
+        metrics_text=metrics_text,
+        rubric_text=RUBRIC_TEXT,
+    )
 
-Response to Evaluate: {final_response}
+    return JUDGE_SYSTEM, user_content
 
-Remember: provide a short explanation, then ONLY return the JSON object exactly as specified above. Do not include any other text or markup.""")
-    ])
 
-    chain = eval_prompt | evaluator
-    response = invoke_with_retry(chain, {
-        "user_input": user_input,
-        "final_response": final_response
-    })
-
-    raw_text = response.content
-
-    # Robust JSON extraction: try direct parse, fenced code block, first {...} block
-    def _extract_json(text: str):
-        # Remove leading/trailing whitespace
-        t = text.strip()
-
-        # If the response is exactly JSON, parse
+def extract_json_from_text(text: str) -> Any:
+    """Extract JSON from text using multiple strategies."""
+    t = text.strip()
+    try:
+        return json.loads(t)
+    except Exception:
+        pass
+    m = re.search(r"```(?:json)?\n(.+?)```", t, re.DOTALL | re.IGNORECASE)
+    if m:
         try:
-            return json.loads(t)
+            return json.loads(m.group(1).strip())
         except Exception:
             pass
+    start = t.find('{')
+    if start != -1:
+        depth = 0
+        for i in range(start, len(t)):
+            if t[i] == '{':
+                depth += 1
+            elif t[i] == '}':
+                depth -= 1
+                if depth == 0:
+                    candidate = t[start:i+1]
+                    try:
+                        return json.loads(candidate)
+                    except Exception:
+                        break
+    m2 = re.search(r"(\{(?:.|\n)*?\})", t)
+    if m2:
+        try:
+            return json.loads(m2.group(1))
+        except Exception:
+            pass
+    return None
 
-        # Look for fenced JSON
-        m = re.search(r"```(?:json)?\n(.+?)```", t, re.DOTALL | re.IGNORECASE)
-        if m:
-            candidate = m.group(1).strip()
-            try:
-                return json.loads(candidate)
-            except Exception:
-                pass
 
-        # Find the first balanced JSON object
-        start = t.find('{')
-        if start != -1:
-            depth = 0
-            for i in range(start, len(t)):
-                if t[i] == '{':
-                    depth += 1
-                elif t[i] == '}':
-                    depth -= 1
-                    if depth == 0:
-                        candidate = t[start:i+1]
-                        try:
-                            return json.loads(candidate)
-                        except Exception:
-                            break
+def validate_judge_output(parsed: dict) -> Tuple[bool, str]:
+    """Validate judge output has all required fields."""
+    if not isinstance(parsed, dict):
+        return False, "not a JSON object"
+    if 'explanation' not in parsed or 'scores' not in parsed:
+        return False, "missing keys 'explanation' or 'scores'"
+    scores = parsed['scores']
+    if not isinstance(scores, dict):
+        return False, "scores is not an object"
+    for m in METRICS:
+        if m not in scores:
+            return False, f"missing metric {m}"
+        v = scores[m]
+        if not isinstance(v, int):
+            return False, f"metric {m} is not int"
+        if not (1 <= v <= 10):
+            return False, f"metric {m} out of range"
+    return True, "ok"
 
-        # Regex fallback
-        m2 = re.search(r"(\{(?:.|\n)*?\})", t)
-        if m2:
-            try:
-                return json.loads(m2.group(1))
-            except Exception:
-                pass
 
-        return None
+def judge_with_retry(judge_fn, system_msg: str, user_msg: str, retries: int = 2):
+    """Call judge with retry logic for malformed responses."""
+    for attempt in range(retries):
+        raw, prompt_tokens, completion_tokens = judge_fn(system_msg, user_msg)
+        parsed = extract_json_from_text(raw)
+        ok, reason = validate_judge_output(parsed) if parsed is not None else (False, 'parse failed')
+        if ok:
+            return parsed, raw, prompt_tokens or 0, completion_tokens or 0
+        user_msg = user_msg + "\n\nFormat-only reminder: After your brief explanation, return ONLY the compact JSON object with keys 'explanation' and 'scores' (scores must map metric names to integers 1-10)."
+    return parsed, raw, prompt_tokens or 0, completion_tokens or 0
 
-    parsed = _extract_json(raw_text)
 
-    metric_keys = [
-        "active_listening",
-        "empathy_validation",
-        "safety_trustworthiness",
-        "openmindedness_nonjudgment",
-        "clarity_encouragement",
-        "boundaries_ethical",
-        "holistic_approach",
-    ]
+def judge_gpt4(system_msg: str, user_msg: str, temperature: float = 0.0, top_p: float = 1.0):
+    """Call GPT-4 judge."""
+    if ChatOpenAI is None:
+        raise RuntimeError("ChatOpenAI not available for gpt4 judge")
+    model = ChatOpenAI(model="gpt-4", temperature=temperature, top_p=top_p)
+    prompt = system_msg + "\n\n" + user_msg
+    resp = model.invoke(prompt)
+    text = resp.content if hasattr(resp, 'content') else str(resp)
+    return text, 0, 0
 
-    def _coerce_score_to_1_10(v):
-        if v is None:
-            return 0
-        if isinstance(v, (int, float)):
-            try:
-                iv = int(round(v))
-            except Exception:
-                return 0
-            return max(1, min(10, iv)) if iv != 0 else 0
-        if isinstance(v, str):
-            s = v.strip().lower()
-            word2num = {"one":1,"two":2,"three":3,"four":4,"five":5,
-                        "six":6,"seven":7,"eight":8,"nine":9,"ten":10,
-                        "1":1,"2":2,"3":3,"4":4,"5":5,"6":6,"7":7,"8":8,"9":9,"10":10}
-            if s in word2num:
-                return word2num[s]
-            m = re.search(r"(\d+)", s)
-            if m:
-                iv = int(m.group(1))
-                return max(1, min(10, iv))
-        return 0
 
-    if parsed is None or not isinstance(parsed, dict):
-        print(f"Warning: Could not parse evaluation response as JSON. Raw response:\n{raw_text}")
-        # return all zeros and empty explanation
-        scores = {k: 0 for k in metric_keys}
-        explanation = ""
-        overall = 0
-        return scores, explanation, raw_text, overall
+def aggregate_and_write_csv(rows: List[Dict[str, Any]], out_csv: str):
+    """Generate aggregated CSV with statistics."""
+    import csv
+    per_judge = {}
+    for r in rows:
+        j = r['judge']
+        per_judge.setdefault(j, []).append(r)
 
-    # Extract explanation and overall_score
-    explanation = parsed.get("explanation", "") if isinstance(parsed.get("explanation", ""), str) else str(parsed.get("explanation", ""))
-    overall_raw = parsed.get("overall_score")
-    overall = _coerce_score_to_1_10(overall_raw)
+    fieldnames = ['judge'] + METRICS + ['overall_mean']
+    with open(out_csv, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        writer.writerow(fieldnames)
+        for j, items in per_judge.items():
+            metric_vals = {m: [] for m in METRICS}
+            overall_vals = []
+            for it in items:
+                sc = it['scores']
+                vals = [sc[m] for m in METRICS]
+                for m, v in zip(METRICS, vals):
+                    metric_vals[m].append(v)
+                overall_vals.append(sum(vals)/len(vals))
+            row = [j]
+            for m in METRICS:
+                mean = statistics.mean(metric_vals[m]) if metric_vals[m] else 0
+                std = statistics.pstdev(metric_vals[m]) if metric_vals[m] else 0
+                row.append(f"{mean:.3f} (std={std:.3f})")
+            row.append(f"{statistics.mean(overall_vals):.3f}" if overall_vals else "0")
+            writer.writerow(row)
 
-    # Extract metric scores
-    scores = {}
-    for k in metric_keys:
-        scores[k] = _coerce_score_to_1_10(parsed.get(k))
+        all_items = rows
+        metric_vals = {m: [] for m in METRICS}
+        overall_vals = []
+        for it in all_items:
+            sc = it['scores']
+            vals = [sc[m] for m in METRICS]
+            for m, v in zip(METRICS, vals):
+                metric_vals[m].append(v)
+            overall_vals.append(sum(vals)/len(vals))
+        row = ['combined']
+        for m in METRICS:
+            mean = statistics.mean(metric_vals[m]) if metric_vals[m] else 0
+            std = statistics.pstdev(metric_vals[m]) if metric_vals[m] else 0
+            row.append(f"{mean:.3f} (std={std:.3f})")
+        row.append(f"{statistics.mean(overall_vals):.3f}" if overall_vals else "0")
+        writer.writerow(row)
 
-    return scores, explanation, raw_text, overall
 
-def evaluate_pipeline(pipeline_function, num_samples, output_csv="evaluation_results.csv"):
-    """
-    Evaluate the pipeline on multiple samples from the MentalChat16K dataset.
+def run_evaluation_official(questions_jsonl: str, output_jsonl: str, model_name: str = "mental-health-pipeline",
+                            temperature_judge: float = 0.0, seed: int = 42, verbose: bool = True):
+    """Official evaluation using a standardized test set with GPT-4 judge.
 
     Args:
-        pipeline_function: The pipeline function to evaluate (should return dict with detailed outputs)
-        num_samples (int): Number of samples to evaluate
-        output_csv (str): Path to save the evaluation results CSV
-
-    Returns:
-        str: Path to the generated CSV file
+        questions_jsonl: Path to JSONL file with questions (typically 200 questions)
+        output_jsonl: Path to save results
+        model_name: Name of the model being evaluated
+        temperature_judge: Temperature for judge (0.0 for deterministic)
+        seed: Random seed for shuffling
+        verbose: Print progress updates
     """
-    print(f"Starting evaluation on {num_samples} samples...")
-    print(f"Results will be saved to: {output_csv}")
+    if mental_health_pipeline_detailed is None or clear_memory is None:
+        raise RuntimeError('Pipeline functions not available')
 
-    # Load dataset
-    ds = load_dataset("ShenLab/MentalChat16K")
+    qs = load_questions_from_jsonl(questions_jsonl)
+    rng = random.Random(seed)
+    rng.shuffle(qs)
 
-    # Prepare CSV
-    fieldnames = [
-        "sample_id",
-        "user_input",
-        "transformed_text",
-        "extracted_memory",
-        "professional_response",
-        "final_response",
-        "raw_eval_response",
-        "eval_explanation",
-        "overall_score",
-        "active_listening",
-        "empathy_validation",
-        "safety_trustworthiness",
-        "openmindedness_nonjudgment",
-        "clarity_encouragement",
-        "boundaries_ethical",
-        "holistic_approach",
-        "average_score"
-    ]
+    cache_path = answers_cache_path(output_jsonl)
+    cache = load_cache(cache_path)
 
     results = []
+    jsonl_fp = open(output_jsonl, 'w', encoding='utf-8')
 
-    # Process samples
-    for i in range(min(num_samples, len(ds['train']))):
-        print(f"\n{'='*60}")
-        print(f"Processing sample {i+1}/{num_samples}...")
-        print(f"{'='*60}")
+    total_questions = len(qs)
+    if verbose:
+        print(f"\n{'='*80}")
+        print(f"OFFICIAL EVALUATION: {total_questions} questions")
+        print(f"{'='*80}\n")
 
-        # Get user input from dataset
-        sample = ds['train'][i]
-        # Try common field names for the question/input
-        user_input = sample.get('question') or sample.get('input') or sample.get('query') or sample.get('text')
+    for idx, q in enumerate(qs):
+        qid = q.get('question_id') or q.get('id') or str(idx)
+        question = q.get('question') or q.get('text')
 
-        if not user_input:
-            print(f"Warning: Could not find input field in sample {i}. Skipping...")
-            continue
+        if verbose:
+            print(f"\n{'='*80}")
+            print(f"QUESTION {idx + 1}/{total_questions} (ID: {qid})")
+            print(f"{'='*80}")
+            print(f"Question: {question}")
+            print(f"{'-'*80}")
 
-        print(f"User Input: {user_input[:100]}...")
+        if qid in cache:
+            answer = cache[qid]
+            if verbose:
+                print(f"[Using cached answer]")
+        else:
+            if verbose:
+                print(f"[Clearing memory for new person...]")
+            clear_memory()
 
-        # Run pipeline
-        try:
-            pipeline_output = pipeline_function(user_input)
+            if verbose:
+                print(f"[Generating pipeline response...]")
+                print(f"  Step 1: Clinical transformation and memory extraction...")
+            pipeline_out = mental_health_pipeline_detailed(question)
+            answer = pipeline_out['final_response']
+            if verbose:
+                print(f"  Step 2: Professional response generation...")
+                print(f"  Step 3: Compassionate tone transformation...")
+                print(f"[Pipeline complete]")
 
-            print("Evaluating response...")
-            # Evaluate the final response (returns scores, explanation, raw_text)
-            scores, explanation, raw_eval, overall = evaluate_response(user_input, pipeline_output['final_response'])
+            cache[qid] = answer
+            save_cache(cache_path, cache)
 
-            # Calculate average score ignoring zeros
-            valid = [v for v in scores.values() if v and v > 0]
-            avg_score = (sum(valid) / len(valid)) if valid else 0
+        if verbose:
+            print(f"\nFinal Response:\n{answer}")
+            print(f"{'-'*80}")
+            print(f"[Evaluating with GPT-4 judge...]")
 
-            # Combine all data
+        system_msg, user_msg = build_prompt_for_judge(question, answer)
+        parsed, raw, ptoks, ctoks = judge_with_retry(
+            lambda s, u: judge_gpt4(s, u, temperature=temperature_judge, top_p=1.0),
+            system_msg, user_msg)
+
+        if parsed is None:
+            if verbose:
+                print(f"[WARNING: Judge evaluation failed]")
             row = {
-                "sample_id": i,
-                "user_input": user_input,
-                "transformed_text": pipeline_output['transformed_text'],
-                "extracted_memory": pipeline_output['extracted_memory'],
-                "professional_response": pipeline_output['professional_response'],
-                "final_response": pipeline_output['final_response'],
-                "raw_eval_response": raw_eval,
-                "eval_explanation": explanation,
-                "overall_score": overall,
-                **scores,
-                "average_score": round(avg_score, 2)
+                'question_id': qid,
+                'model': model_name,
+                'judge': 'gpt4-turbo',
+                'scores': {m: 0 for m in METRICS},
+                'explanation': '',
+                'raw_prompt_tokens': ptoks,
+                'raw_completion_tokens': ctoks,
+            }
+        else:
+            scores_list = [parsed['scores'][m] for m in METRICS]
+            avg_score = sum(scores_list) / len(scores_list)
+            if verbose:
+                print(f"[Evaluation complete - Average Score: {avg_score:.2f}/10]")
+                print(f"Scores: {parsed['scores']}")
+
+            row = {
+                'question_id': qid,
+                'model': model_name,
+                'judge': 'gpt4-turbo',
+                'scores': parsed['scores'],
+                'explanation': parsed.get('explanation', ''),
+                'raw_prompt_tokens': ptoks,
+                'raw_completion_tokens': ctoks,
             }
 
-            results.append(row)
+        dump_jsonl_line(jsonl_fp, row)
+        results.append(row)
 
-            print(f"Average Score (metrics mean): {avg_score:.2f}/10")
-            print(f"Scores: {scores}")
+        if verbose:
+            print(f"{'='*80}\n")
 
-        except Exception as e:
-            print(f"Error processing sample {i}: {e}")
-            import traceback
-            traceback.print_exc()
-            continue
+    jsonl_fp.close()
 
-    # Write to CSV
-    with open(output_csv, 'w', newline='', encoding='utf-8') as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(results)
+    if verbose:
+        print(f"\n{'='*80}")
+        print(f"EVALUATION COMPLETE - Generating summary...")
+        print(f"{'='*80}\n")
 
-    print(f"\n{'='*60}")
-    print(f"Evaluation complete! Results saved to: {output_csv}")
-    print(f"Total samples evaluated: {len(results)}")
+    out_csv = Path(output_jsonl).with_suffix('.aggregated.csv')
+    aggregate_and_write_csv(results, str(out_csv))
 
-    if results:
-        overall_avg = sum(r['average_score'] for r in results) / len(results)
-        print(f"Overall Average Score: {overall_avg:.2f}/5")
+    if verbose:
+        print(f'Wrote results to {output_jsonl}')
+        print(f'Wrote aggregated CSV to {out_csv}')
 
-        # Print individual metric averages
-        print("\nAverage scores by metric:")
-        for metric in ["active_listening", "empathy_validation", "safety_trustworthiness",
-                       "openmindedness_nonjudgment", "clarity_encouragement",
-                       "boundaries_ethical", "holistic_approach"]:
-            metric_avg = sum(r[metric] for r in results) / len(results)
-            print(f"  {metric}: {metric_avg:.2f}/5")
+    return str(out_csv)
 
-    print(f"{'='*60}")
 
-    return output_csv
+def run_evaluation_unofficial(num_samples: int = 20, output_jsonl: str = "eval_unofficial.jsonl",
+                              model_name: str = "mental-health-pipeline", seed: int = 42,
+                              verbose: bool = True):
+    """Unofficial evaluation using random samples from the dataset.
 
-# Example usage
-if __name__ == "__main__":
-    from pipeline import mental_health_pipeline_detailed
+    Quick evaluation for testing purposes. Randomly samples from MentalChat16K dataset.
 
-    # Run evaluation on 5 samples
-    evaluate_pipeline(mental_health_pipeline_detailed, num_samples=5)
+    Args:
+        num_samples: Number of samples to evaluate
+        output_jsonl: Path to save results
+        model_name: Name of the model being evaluated
+        seed: Random seed for reproducibility
+        verbose: Print progress updates
+    """
+    # Generate temporary question file
+    temp_questions = f"temp_eval_{num_samples}_questions.jsonl"
+    generate_test_set(num_samples, temp_questions, seed=seed)
+
+    # Run evaluation using the official function
+    result = run_evaluation_official(
+        questions_jsonl=temp_questions,
+        output_jsonl=output_jsonl,
+        model_name=model_name,
+        temperature_judge=0.0,
+        seed=seed,
+        verbose=verbose
+    )
+
+    # Clean up temp file
+    Path(temp_questions).unlink(missing_ok=True)
+
+    return result
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Mental Health Pipeline Evaluation')
+    parser.add_argument('--mode', choices=['official', 'unofficial'],
+                       help='Evaluation mode: official (200 test set) or unofficial (random sampling)')
+    parser.add_argument('--questions_jsonl', type=str,
+                       help='Path to questions JSONL file (required for official mode)')
+    parser.add_argument('--num_samples', type=int, default=20,
+                       help='Number of samples for unofficial mode (default: 20)')
+    parser.add_argument('--output', type=str, default='evaluation_results.jsonl',
+                       help='Output JSONL file path')
+    parser.add_argument('--model_name', type=str, default='mental-health-pipeline',
+                       help='Model name for results')
+    parser.add_argument('--seed', type=int, default=42,
+                       help='Random seed for reproducibility')
+    parser.add_argument('--generate_test_set', type=int, metavar='N',
+                       help='Generate a test set with N questions and exit')
+
+    args = parser.parse_args()
+
+    # Generate test set mode
+    if args.generate_test_set:
+        output_path = f"test_set_{args.generate_test_set}.jsonl"
+        generate_test_set(args.generate_test_set, output_path, seed=args.seed)
+        return
+
+    # Validate mode is provided for evaluation
+    if not args.mode:
+        parser.error("--mode is required when not using --generate_test_set")
+
+    # Run evaluation
+    if args.mode == 'official':
+        if not args.questions_jsonl:
+            print("Error: --questions_jsonl is required for official mode")
+            sys.exit(1)
+        run_evaluation_official(
+            questions_jsonl=args.questions_jsonl,
+            output_jsonl=args.output,
+            model_name=args.model_name,
+            seed=args.seed,
+            verbose=True
+        )
+    else:  # unofficial
+        run_evaluation_unofficial(
+            num_samples=args.num_samples,
+            output_jsonl=args.output,
+            model_name=args.model_name,
+            seed=args.seed,
+            verbose=True
+        )
+
+
+if __name__ == '__main__':
+    main()

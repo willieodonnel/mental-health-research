@@ -128,11 +128,52 @@ The pipeline maintains persistent memory in `memory.txt`:
 - **Cognitive Monitoring**: Tracks patterns related to cognition and mental state
 - **Append-Only**: New memories are added without overwriting existing entries
 
+## Evaluation
+
+The pipeline can be evaluated using the standardized MentalChat16K metrics with GPT-4 as the judge.
+
+### Unofficial Evaluation (Quick Testing)
+
+For quick testing with random samples from the dataset:
+
+```bash
+python evaluation.py --mode unofficial --num_samples 20
+```
+
+### Official Evaluation (200 Test Set)
+
+For standardized evaluation with the 200-question test set:
+
+```bash
+# First, generate the test set
+python evaluation.py --generate_test_set 200
+
+# Then run the official evaluation
+python evaluation.py --mode official --questions_jsonl test_set_200.jsonl
+```
+
+### Evaluation Metrics
+
+The evaluation uses 7 metrics from the MentalChat16K research:
+1. **Active Listening** - reflects understanding without assumptions
+2. **Empathy & Validation** - conveys understanding and validates feelings
+3. **Safety & Trustworthiness** - avoids harm; information is consistent/reliable
+4. **Open-mindedness & Non-judgment** - unbiased, respectful, unconditional positive regard
+5. **Clarity & Encouragement** - clear, concise, motivating while neutral
+6. **Boundaries & Ethical** - clarifies role/limits; suggests professional help appropriately
+7. **Holistic Approach** - addresses emotional/cognitive/situational context broadly
+
+Results are saved as:
+- JSONL file with detailed scores for each question
+- Aggregated CSV with mean and standard deviation per metric
+
 ## File Structure
 
 ```
 Mental Health Research/
-├── main.py           # Main pipeline implementation
+├── main.py           # Demo script for the pipeline
+├── pipeline.py       # Three-stage pipeline implementation
+├── evaluation.py     # Evaluation script (official & unofficial modes)
 ├── .env              # Environment variables (API key) - DO NOT COMMIT
 ├── .gitignore        # Git ignore rules (includes .env and memory.txt)
 ├── memory.txt        # Patient memory storage (auto-created)

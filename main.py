@@ -1,38 +1,31 @@
 """
-Main script to run the mental health pipeline evaluation.
+Main script to run the mental health pipeline.
 
-This script imports the pipeline from pipeline.py and the evaluation
-functions from evaluation.py, then runs an evaluation on a specified
-number of samples from the MentalChat16K dataset.
+This script demonstrates the three-stage pipeline for mental health support.
+For evaluation, use evaluation.py with --mode unofficial or --mode official.
 """
 
-from pipeline import mental_health_pipeline_detailed
-from evaluation import evaluate_pipeline
-from datetime import datetime
+from pipeline import mental_health_pipeline
 
 if __name__ == "__main__":
+    # Example user input
+    example_input = """I've been feeling really anxious lately. I can't seem to focus on anything
+    and I keep forgetting things. Yesterday I forgot my meeting and today I left my keys in the door.
+    I'm worried something is wrong with my memory."""
+
     print("=" * 60)
-    print("MENTAL HEALTH PIPELINE EVALUATION")
+    print("MENTAL HEALTH SUPPORT PIPELINE - DEMO")
     print("=" * 60)
-    print(f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print()
+    print("Running pipeline with example input...")
     print()
 
-    # Configuration
-    NUM_SAMPLES = 10
-    OUTPUT_CSV = f"evaluation_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-
-    print(f"Configuration:")
-    print(f"  - Number of samples: {NUM_SAMPLES}")
-    print(f"  - Output file: {OUTPUT_CSV}")
-    print()
-
-    # Run evaluation
-    evaluate_pipeline(
-        pipeline_function=mental_health_pipeline_detailed,
-        num_samples=NUM_SAMPLES,
-        output_csv=OUTPUT_CSV
-    )
+    # Run the pipeline
+    response = mental_health_pipeline(example_input)
 
     print()
-    print(f"Completed at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("=" * 60)
+    print("For evaluation, use:")
+    print("  Unofficial (quick test): python evaluation.py --mode unofficial --num_samples 20")
+    print("  Official (200 test set): python evaluation.py --mode official --questions_jsonl test_set_200.jsonl")
     print("=" * 60)
