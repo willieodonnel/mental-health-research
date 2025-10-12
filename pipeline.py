@@ -12,8 +12,16 @@ load_dotenv()
 # Load the dataset
 ds = load_dataset("ShenLab/MentalChat16K")
 
-# Initialize the LLM (API key loaded from .env file)
-llm = ChatOpenAI(model="gpt-4", temperature=0.7)
+# Initialize LLMs with different temperatures for different stages
+# LLM1: Clinical transformation - moderate creativity for natural transformation
+llm1 = ChatOpenAI(model="gpt-4", temperature=0.7)
+# LLM2: Professional response - lower temp for consistent, evidence-based responses
+llm2 = ChatOpenAI(model="gpt-4", temperature=0.5)
+# LLM3: Warmification - moderate temp to maintain natural, warm tone
+llm3 = ChatOpenAI(model="gpt-4", temperature=0.7)
+
+# For backwards compatibility
+llm = llm1
 
 # Memory file path
 MEMORY_FILE = Path("memory.txt")
@@ -96,7 +104,7 @@ BROADER CONTEXT:
         ("human", "{input}")
     ])
 
-    chain = prompt | llm
+    chain = prompt | llm1
     response = invoke_with_retry(chain, {"input": user_input})
 
     # Parse the response
@@ -119,7 +127,22 @@ def llm2_generate_professional_response(transformed_text):
     prompt = ChatPromptTemplate.from_messages([
         ("system", """You are a professional mental health clinician. You provide factual, reasonable, and professional responses.
 
+CRITICAL: Begin by explicitly acknowledging and reflecting the patient's specific concerns to demonstrate active listening.
+
 You have access to patient history and important facts that have been documented. Use this information along with the current clinical note to generate an appropriate, professional response.
+
+Your response should:
+1. FIRST: Explicitly acknowledge what the patient has shared (active listening)
+2. Reflect back their key concerns to show understanding
+3. Address multiple dimensions comprehensively (holistic approach):
+   - Emotional aspects (feelings, mood, emotional state)
+   - Cognitive aspects (thoughts, patterns, beliefs)
+   - Behavioral aspects (actions, coping strategies)
+   - Situational aspects (circumstances, relationships, stressors)
+   - Physical aspects if relevant (sleep, energy, physical symptoms)
+4. Provide evidence-based guidance
+5. When appropriate, suggest professional support or additional resources
+6. Acknowledge the limits of text-based support when dealing with complex or severe issues
 
 Your response should be:
 - Professional and clinical in tone
@@ -133,10 +156,10 @@ Patient History and Important Facts:
         ("human", """Current Clinical Note:
 {transformed_text}
 
-Please provide a professional clinical response.""")
+Please provide a professional clinical response that demonstrates active listening and addresses the patient's concerns holistically.""")
     ])
 
-    chain = prompt | llm
+    chain = prompt | llm2
     response = invoke_with_retry(chain, {
         "transformed_text": transformed_text,
         "memory": existing_memory if existing_memory else "No previous history available."
@@ -151,22 +174,28 @@ def llm3_warmify_response(professional_response):
     prompt = ChatPromptTemplate.from_messages([
         ("system", """You are an expert at transforming clinical language into warm, compassionate, direct communication while preserving all factual content.
 
+CRITICAL: Preserve all specific references to the patient's concerns. Do not make the response generic or vague.
+
 Your task:
 - Transform the professional clinical response into a direct, conversational response
+- START by acknowledging what they specifically shared (maintain active listening)
+- RETAIN all specific details about their situation, feelings, and circumstances
 - DO NOT write like a letter or formal message (avoid "Dear...", formal greetings, closings)
+- DO NOT sign the message with a name, signature, or closing like "[Your Name]", "Sincerely", "Take care", etc.
 - Be direct, warm, and professional - like a therapist speaking naturally to someone
-- Retain ALL factual elements and recommendations
+- Retain ALL factual elements, specific examples, and recommendations
 - Make the tone empathetic, supportive, and human
 - Use accessible language that makes the person feel heard and cared for
 - Keep it concise and conversational
-- Do not add new clinical content, only adjust the tone and warmth"""),
+- Do not add new clinical content, only adjust the tone and warmth
+- End naturally without formal closings or signatures"""),
         ("human", """Professional Response:
 {professional_response}
 
-Transform this into a warm, direct, conversational response while keeping all the facts.""")
+Transform this into a warm, direct, conversational response while keeping all the facts and specific details. Do not add any signatures or formal closings.""")
     ])
 
-    chain = prompt | llm
+    chain = prompt | llm3
     response = invoke_with_retry(chain, {"professional_response": professional_response})
 
     return response.content

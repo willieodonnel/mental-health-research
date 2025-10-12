@@ -131,9 +131,11 @@ def generate_test_set(num_questions: int, output_path: str, seed: int = 42) -> s
         for item in items:
             if count >= num_questions:
                 break
-            qid = item.get('question_id') or item.get('id') or item.get('qid') or str(count)
-            question = item.get('question') or item.get('text') or item.get('prompt') or item.get('instruction') or ''
-            if question:
+            # Use 'input' field which contains actual patient questions
+            # NOT 'instruction' which is the system prompt
+            question = item.get('input') or item.get('text') or item.get('query') or ''
+            if question and len(question.strip()) > 0:
+                qid = item.get('question_id') or item.get('id') or item.get('qid') or str(count)
                 obj = {'question_id': qid, 'question': question}
                 f.write(json.dumps(obj, ensure_ascii=False) + '\n')
                 count += 1
@@ -257,14 +259,130 @@ def judge_with_retry(judge_fn, system_msg: str, user_msg: str, retries: int = 2)
 
 
 def judge_gpt4(system_msg: str, user_msg: str, temperature: float = 0.0, top_p: float = 1.0):
-    """Call GPT-4 judge."""
+    """Call GPT-4 judge (matching MentalChat16K paper methodology - original GPT-4)."""
     if ChatOpenAI is None:
         raise RuntimeError("ChatOpenAI not available for gpt4 judge")
+    # Use gpt-4 (original model as used in the paper)
     model = ChatOpenAI(model="gpt-4", temperature=temperature, top_p=top_p)
     prompt = system_msg + "\n\n" + user_msg
     resp = model.invoke(prompt)
     text = resp.content if hasattr(resp, 'content') else str(resp)
     return text, 0, 0
+
+
+def paper_baseline_response(question: str) -> str:
+    """
+    Paper baseline: Simple echo of the question without any processing.
+    This replicates the baseline approach from the MentalChat16K paper.
+    """
+    return question
+
+
+def run_paper_baseline_evaluation(
+    questions_jsonl: str,
+    output_jsonl: str = "results_paper_baseline.jsonl",
+    num_samples: int = 20,
+    judge_name: str = "gpt4"
+):
+    """
+    Run evaluation using the paper's baseline approach (no pipeline processing).
+
+    This function:
+    1. Loads questions from the test set
+    2. Uses questions directly as responses (paper baseline)
+    3. Evaluates using GPT-4 judge with exact paper methodology
+    4. Saves results for comparison
+
+    Args:
+        questions_jsonl: Path to test questions file
+        output_jsonl: Output file for results
+        num_samples: Number of questions to evaluate
+        judge_name: Judge to use (gpt4)
+    """
+    print(f"Running paper baseline evaluation on {num_samples} questions...")
+    print("Baseline: Using input question as response (no pipeline processing)")
+
+    # Load questions
+    questions = load_questions_from_jsonl(questions_jsonl)[:num_samples]
+
+    # Select judge
+    if judge_name == "gpt4":
+        judge_fn = judge_gpt4
+    else:
+        raise ValueError(f"Unknown judge: {judge_name}")
+
+    # Build metrics text
+    metrics_descriptions = {
+        "Active Listening": "Responses demonstrate careful consideration of user concerns, reflecting understanding and capturing the essence of the issue. Avoid assumptions or jumping to conclusions.",
+        "Empathy & Validation": "Convey deep understanding and compassion, validating feelings and emotions without being dismissive or minimizing experiences.",
+        "Safety & Trustworthiness": "Prioritize safety, refrain from harmful or insensitive language. Ensure the information provided is consistent and trustworthy.",
+        "Open-mindedness & Non-judgment": "Approach without bias or judgment. Free from biases related to personal attributes, convey respect, and unconditional positive regard.",
+        "Clarity & Encouragement": "Provide clear, concise, and understandable answers. Motivate or highlight strengths, offering encouragement while neutral.",
+        "Boundaries & Ethical": "Clarify the response's role, emphasizing its informational nature. In complex scenarios, guide users to seek professional assistance.",
+        "Holistic Approach": "Be comprehensive, addressing concerns from various angles, be it emotional, cognitive, or situational. Consider the broader context, even if not explicitly detailed in the query."
+    }
+    metrics_text = "\n".join(f"- **{m}**: {metrics_descriptions[m]}" for m in METRICS)
+
+    results = []
+    total_prompt_tokens = 0
+    total_completion_tokens = 0
+
+    for i, q_obj in enumerate(questions):
+        question_id = q_obj.get('question_id', str(i))
+        question = q_obj.get('question', '')
+
+        print(f"\n[{i+1}/{len(questions)}] Evaluating question {question_id}...")
+
+        # Paper baseline: use question as response
+        baseline_response = paper_baseline_response(question)
+
+        # Prepare judge prompt using exact paper format
+        user_msg = USER_TEMPLATE.format(
+            question=question,
+            answer=baseline_response,
+            metrics_text=metrics_text,
+            rubric_text=RUBRIC_TEXT
+        )
+
+        # Call judge with retry
+        parsed, raw, p_tok, c_tok = judge_with_retry(judge_fn, JUDGE_SYSTEM, user_msg)
+        total_prompt_tokens += p_tok
+        total_completion_tokens += c_tok
+
+        # Store result
+        result = {
+            'question_id': question_id,
+            'question': question,
+            'baseline_response': baseline_response,
+            'judge': judge_name,
+            'scores': parsed.get('scores', {}) if parsed else {},
+            'explanation': parsed.get('explanation', '') if parsed else '',
+            'raw_judge_output': raw
+        }
+        results.append(result)
+
+        # Print scores
+        if parsed and 'scores' in parsed:
+            scores = parsed['scores']
+            print(f"  Scores: {scores}")
+            avg = sum(scores.values()) / len(scores) if scores else 0
+            print(f"  Average: {avg:.2f}/10")
+
+    # Write results
+    with open(output_jsonl, 'w', encoding='utf-8') as f:
+        for r in results:
+            f.write(json.dumps(r, ensure_ascii=False) + '\n')
+
+    # Generate aggregated CSV
+    csv_file = output_jsonl.replace('.jsonl', '.aggregated.csv')
+    aggregate_and_write_csv(results, csv_file)
+
+    print(f"\n[DONE] Paper baseline evaluation complete!")
+    print(f"  Results: {output_jsonl}")
+    print(f"  Aggregated: {csv_file}")
+    print(f"  Total tokens: {total_prompt_tokens + total_completion_tokens}")
+
+    return results
 
 
 def aggregate_and_write_csv(rows: List[Dict[str, Any]], out_csv: str):
@@ -476,12 +594,12 @@ def run_evaluation_unofficial(num_samples: int = 20, output_jsonl: str = "eval_u
 
 def main():
     parser = argparse.ArgumentParser(description='Mental Health Pipeline Evaluation')
-    parser.add_argument('--mode', choices=['official', 'unofficial'],
-                       help='Evaluation mode: official (200 test set) or unofficial (random sampling)')
+    parser.add_argument('--mode', choices=['official', 'unofficial', 'paper_baseline'],
+                       help='Evaluation mode: official (200 test set), unofficial (random sampling), or paper_baseline (replicate paper methodology)')
     parser.add_argument('--questions_jsonl', type=str,
-                       help='Path to questions JSONL file (required for official mode)')
+                       help='Path to questions JSONL file (required for official mode and paper_baseline)')
     parser.add_argument('--num_samples', type=int, default=20,
-                       help='Number of samples for unofficial mode (default: 20)')
+                       help='Number of samples for unofficial mode and paper_baseline (default: 20)')
     parser.add_argument('--output', type=str, default='evaluation_results.jsonl',
                        help='Output JSONL file path')
     parser.add_argument('--model_name', type=str, default='mental-health-pipeline',
@@ -514,6 +632,16 @@ def main():
             model_name=args.model_name,
             seed=args.seed,
             verbose=True
+        )
+    elif args.mode == 'paper_baseline':
+        if not args.questions_jsonl:
+            print("Error: --questions_jsonl is required for paper_baseline mode")
+            sys.exit(1)
+        run_paper_baseline_evaluation(
+            questions_jsonl=args.questions_jsonl,
+            output_jsonl=args.output,
+            num_samples=args.num_samples,
+            judge_name='gpt4'
         )
     else:  # unofficial
         run_evaluation_unofficial(

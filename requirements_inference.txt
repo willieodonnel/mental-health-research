@@ -1,0 +1,14 @@
+# Mental Health Inference Pipeline Requirements
+
+# Core dependencies
+torch>=2.0.0
+transformers>=4.35.0
+accelerate>=0.24.0
+bitsandbytes>=0.41.0
+
+# Optional but recommended
+sentencepiece>=0.1.99
+protobuf>=3.20.0
+
+# Note: Make sure you have CUDA installed for GPU support
+# Visit: https://pytorch.org/get-started/locally/ for PyTorch installation with CUDA
