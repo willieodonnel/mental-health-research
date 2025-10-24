@@ -1,8 +1,15 @@
 """
-Main script to run the mental health pipeline.
+LEGACY Main Script - GPT-4 Three-Stage Pipeline
 
-This script demonstrates the three-stage pipeline for mental health support.
-For evaluation, use evaluation.py with --mode unofficial or --mode official.
+WARNING: This script uses the LEGACY three-stage GPT-4 pipeline, NOT the main inference method.
+
+For the recommended Mistral-7B local inference, use:
+- mental_health_inference.py (batch mode)
+- run_custom_questions.py (custom questions)
+- Interactive mode via MentalHealthInferencePipeline().interactive_mode()
+
+This script demonstrates the three-stage GPT-4 pipeline (requires OpenAI API key and incurs costs).
+For evaluation, use evaluation_local.py with Mistral-7B inference.
 """
 
 from pipeline import mental_health_pipeline

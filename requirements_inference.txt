@@ -1,7 +1,16 @@
 # Mental Health Inference Pipeline Requirements
+# Optimized for RTX 5080 (Blackwell Architecture) with PyTorch Nightly
+
+# =============================================================================
+# PyTorch Nightly (REQUIRED for RTX 5080 Support)
+# =============================================================================
+# Install PyTorch nightly with CUDA 12.8 support for RTX 5080:
+# pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128
+#
+# Your current setup: PyTorch 2.8.0+cu128 (nightly build) - Already configured!
+# =============================================================================
 
 # Core dependencies
-torch>=2.0.0
 transformers>=4.35.0
 accelerate>=0.24.0
 bitsandbytes>=0.41.0
@@ -10,5 +19,48 @@ bitsandbytes>=0.41.0
 sentencepiece>=0.1.99
 protobuf>=3.20.0
 
-# Note: Make sure you have CUDA installed for GPU support
-# Visit: https://pytorch.org/get-started/locally/ for PyTorch installation with CUDA
+# Dataset and utilities
+datasets>=2.14.0
+tqdm>=4.66.0
+
+# For GPT-4 evaluation (optional, only needed for evaluation)
+langchain>=0.1.0
+langchain-openai>=0.0.5
+langchain-community>=0.0.20
+python-dotenv>=1.0.0
+openai>=1.6.0
+
+# =============================================================================
+# INSTALLATION INSTRUCTIONS FOR RTX 5080
+# =============================================================================
+#
+# Step 1: Install PyTorch Nightly (Required for RTX 5080)
+# -------------------------------------------------------
+# The RTX 5080 uses Blackwell architecture (compute capability sm_120) which
+# requires PyTorch nightly builds. Stable PyTorch releases do not yet support it.
+#
+# Run this command:
+# pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128
+#
+# Step 2: Install Other Dependencies
+# -----------------------------------
+# pip install transformers accelerate bitsandbytes sentencepiece protobuf datasets tqdm
+#
+# Step 3: Verify Installation
+# ----------------------------
+# python test_setup.py
+#
+# Expected output:
+# - PyTorch version: 2.8.0+cu128 (or newer)
+# - CUDA available: True
+# - CUDA version: 12.8
+# - GPU: NVIDIA GeForce RTX 5080
+#
+# =============================================================================
+# NOTES
+# =============================================================================
+# - CUDA Toolkit 12.8+ should be installed on your system
+# - RTX 5080 has 16GB VRAM - sufficient for FP16 inference (~14GB usage)
+# - 4-bit quantization will use ~3.5GB VRAM
+# - PyTorch nightly updates frequently - reinstall weekly for best performance
+# =============================================================================

@@ -1,3 +1,19 @@
+"""
+LEGACY Three-Stage Pipeline using GPT-4
+
+NOTE: This pipeline is kept for research purposes but is NOT the main inference method.
+
+The primary inference method uses Mistral-7B-Instruct locally (see mental_health_inference.py).
+
+This file implements a three-stage GPT-4 pipeline:
+1. Clinical transformation (GPT-4)
+2. Professional response (GPT-4)
+3. Compassionate tone (GPT-4)
+
+WARNING: This requires an OpenAI API key and will incur costs.
+For free, local inference, use mental_health_inference.py instead.
+"""
+
 from datasets import load_dataset
 from langchain_openai import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate

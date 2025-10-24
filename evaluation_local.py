@@ -1,6 +1,16 @@
 """
-Local Mistral-7B Evaluation with GPT-4 Turbo as Judge
-Uses LOCAL Mistral model for generating responses, GPT-4 only for evaluation
+Local Mistral-7B Inference with GPT-4 as Judge for Evaluation
+
+IMPORTANT ARCHITECTURE:
+- INFERENCE: Uses LOCAL Mistral-7B-Instruct on RTX 5080 (NO ChatGPT/GPT-4)
+- EVALUATION: Uses GPT-4 ONLY as an impartial judge to score responses
+
+This script:
+1. Generates responses using Mistral-7B-Instruct locally on your GPU
+2. Sends those responses to GPT-4 for scoring (GPT-4 never generates responses)
+3. Saves evaluation results
+
+GPT-4 is used ONLY for judging quality, NOT for generating counseling responses.
 """
 
 import json
@@ -11,6 +21,13 @@ from pathlib import Path
 from typing import Dict, Any, List
 from tqdm import tqdm
 import sys
+
+# Load .env file to get OpenAI API key
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # dotenv not installed, will check environment variables directly
 
 # Load OpenAI API key from environment (will be checked when needed)
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")

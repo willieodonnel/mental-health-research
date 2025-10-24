@@ -1,5 +1,15 @@
 """
-Custom question runner - easily test your own mental health questions
+Custom Question Runner - Mistral-7B Local Inference
+
+This script runs Mistral-7B-Instruct locally on your RTX 5080 to process custom questions.
+
+IMPORTANT:
+- Uses ONLY Mistral-7B-Instruct for inference (NO ChatGPT/GPT-4)
+- Runs 100% locally on your GPU
+- No API key needed
+- Fully private and cost-free
+
+Just add your questions to CUSTOM_QUESTIONS and run!
 """
 
 from mental_health_inference import MentalHealthInferencePipeline
