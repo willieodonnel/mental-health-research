@@ -1,38 +1,91 @@
 """
-LEGACY Main Script - GPT-4 Three-Stage Pipeline
+Mistral-7B Local Inference Pipeline
 
-WARNING: This script uses the LEGACY three-stage GPT-4 pipeline, NOT the main inference method.
-
-For the recommended Mistral-7B local inference, use:
-- mental_health_inference.py (batch mode)
-- run_custom_questions.py (custom questions)
-- Interactive mode via MentalHealthInferencePipeline().interactive_mode()
-
-This script demonstrates the three-stage GPT-4 pipeline (requires OpenAI API key and incurs costs).
-For evaluation, use evaluation_local.py with Mistral-7B inference.
+This is an extremely basic pipeline for exploring Mistral-7B-Instruct locally.
 """
 
-from pipeline import mental_health_pipeline
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+def load_model():
+    """Load Mistral-7B-Instruct model and tokenizer."""
+    model_name = "mistralai/Mistral-7B-Instruct-v0.2"
+
+    print("Loading Mistral-7B-Instruct...")
+
+    # Load tokenizer
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    tokenizer.pad_token = tokenizer.eos_token
+
+    # Load model (will auto-detect GPU)
+    model = AutoModelForCausalLM.from_pretrained(
+        model_name,
+        dtype=torch.float16,  # Use FP16 for RTX 5080
+        device_map="auto"            # Automatically use GPU if available
+    )
+
+    print(f"Model loaded successfully! Using {model.device}")
+    return model, tokenizer
+
+
+def generate(model, tokenizer, prompt, max_length=1024):
+    """Generate a response from the model."""
+    # Format prompt in Mistral instruction format
+    formatted_prompt = f"[INST] {prompt} [/INST]"
+
+    # Tokenize
+    inputs = tokenizer(formatted_prompt, return_tensors="pt", truncation=True)
+    inputs = {k: v.to(model.device) for k, v in inputs.items()}
+
+    # Generate
+    with torch.no_grad():
+        outputs = model.generate(
+            **inputs,
+            max_length=max_length,
+            temperature=0.5,
+            do_sample=True,
+            top_p=0.95
+        )
+
+    # Decode
+    response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+    # Extract just the response (after [/INST])
+    response = response.split("[/INST]")[-1].strip()
+
+    return response
+
+
+def main():
+    """Basic demo - load model and test with one question."""
+    # Load the model
+    model, tokenizer = load_model()
+
+    # Test prompt
+    prompt = "I can't stop washing my hands because I feel unclean. If I stop, my hands might get dirty. Last week, my hands started to peel and were red. There's nothing wrong with this, right?"
+
+    print("\n" + "="*60)
+    print("PROMPT:", prompt)
+    print("="*60)
+
+    # Generate response
+    response = generate(model, tokenizer, prompt)
+
+    print("\nRESPONSE:")
+    print("-"*60)
+    print(response)
+    print("-"*60)
+
+    # Interactive mode (optional)
+    print("\nEnter 'quit' to exit, or type a message to chat:")
+    while True:
+        user_input = input("\nYou: ").strip()
+        if user_input.lower() in ['quit', 'exit', 'q']:
+            break
+
+        response = generate(model, tokenizer, user_input)
+        print(f"\nMistral: {response}")
+
 
 if __name__ == "__main__":
-    # Example user input
-    example_input = """I've been feeling really anxious lately. I can't seem to focus on anything
-    and I keep forgetting things. Yesterday I forgot my meeting and today I left my keys in the door.
-    I'm worried something is wrong with my memory."""
-
-    print("=" * 60)
-    print("MENTAL HEALTH SUPPORT PIPELINE - DEMO")
-    print("=" * 60)
-    print()
-    print("Running pipeline with example input...")
-    print()
-
-    # Run the pipeline
-    response = mental_health_pipeline(example_input)
-
-    print()
-    print("=" * 60)
-    print("For evaluation, use:")
-    print("  Unofficial (quick test): python evaluation.py --mode unofficial --num_samples 20")
-    print("  Official (200 test set): python evaluation.py --mode official --questions_jsonl test_set_200.jsonl")
-    print("=" * 60)
+    main()
