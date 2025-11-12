@@ -5,7 +5,6 @@ IMPORTANT:
 - This pipeline uses ONLY Mistral-7B-Instruct for inference (NO ChatGPT/GPT-4)
 - Runs 100% locally on your RTX 5080 GPU with PyTorch nightly
 - GPT-4 is ONLY used as a judge for evaluation (see evaluation_local.py)
-- No API key needed for inference - fully private and cost-free
 
 Technical Details:
 - Model: Mistral-7B-Instruct-v0.2
