@@ -20,11 +20,11 @@ def load_model():
     # Load model (will auto-detect GPU)
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
-        dtype=torch.float16,  # Use FP16 for RTX 5080
-        device_map="auto"            # Automatically use GPU if available
+        dtype=torch.float16,
+        device_map="auto"
     )
 
-    print(f"Model loaded successfully! Using {model.device}")
+    print(f"Model loaded successfully!")
     return model, tokenizer
 
 
@@ -34,7 +34,7 @@ def generate(model, tokenizer, prompt, max_length=1024):
     formatted_prompt = f"[INST] {prompt} [/INST]"
 
     # Tokenize
-    inputs = tokenizer(formatted_prompt, return_tensors="pt", truncation=True)
+    inputs = tokenizer(formatted_prompt, return_tensors="pt", truncation=False)
     inputs = {k: v.to(model.device) for k, v in inputs.items()}
 
     # Generate
@@ -57,7 +57,6 @@ def generate(model, tokenizer, prompt, max_length=1024):
 
 
 def main():
-    """Basic demo - load model and test with one question."""
     # Load the model
     model, tokenizer = load_model()
 
@@ -86,6 +85,17 @@ def main():
         response = generate(model, tokenizer, user_input)
         print(f"\nMistral: {response}")
 
+'''
+Basic pipeline implementation for our local pipeline
+'''
+def pipeline(prompt: str, ):
+    model, tokenizer = load_model()
+
+
+
+
+
+    return True
 
 if __name__ == "__main__":
     main()

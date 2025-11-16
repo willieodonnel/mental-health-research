@@ -12,7 +12,6 @@ def load_model():
     base_model_name = "unsloth/Llama-3.2-1B-Instruct"
     tokenizer = AutoTokenizer.from_pretrained(base_model_name)
 
-
     base_model = AutoModelForCausalLM.from_pretrained(base_model_name, 
                                       dtype=torch.float16,
                                       device_map='auto')
@@ -45,8 +44,6 @@ def run_pipeline(prompt: str):
     model, tokenizer = load_model()
 
     response = generate(model, tokenizer, prompt)
-
-    print(response)
 
 if __name__ == "__main__":
     run_pipeline("I've been really scared that my hands aren't clean. I can't stop washing them because I'm scared they'll get dirty and I'll get sick and die.")
