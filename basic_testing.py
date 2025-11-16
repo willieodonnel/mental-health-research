@@ -91,10 +91,6 @@ Basic pipeline implementation for our local pipeline
 def pipeline(prompt: str, ):
     model, tokenizer = load_model()
 
-
-
-
-
     return True
 
 if __name__ == "__main__":
