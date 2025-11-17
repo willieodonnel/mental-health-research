@@ -32,7 +32,7 @@ def load_model():
     return model, tokenizer
 
 
-def generate(model, tokenizer, prompt, max_length=1024):
+def generate(model, tokenizer, prompt, max_new_tokens=512):
     """Generate response - same as main.py."""
     # Format in Mistral instruction format
     formatted_prompt = f"[INST] {prompt} [/INST]"
@@ -45,10 +45,11 @@ def generate(model, tokenizer, prompt, max_length=1024):
     with torch.no_grad():
         outputs = model.generate(
             **inputs,
-            max_length=max_length,
+            max_new_tokens=max_new_tokens,
             temperature=0.7,
             do_sample=True,
-            top_p=0.95
+            top_p=0.95,
+            pad_token_id=tokenizer.eos_token_id
         )
 
     # Decode
@@ -99,13 +100,21 @@ Identify key concerns and provide professional opinion."""
     print(professional_opinion)
 
     # Component 3: Final response
-    response_prompt = f"""You are an empathetic counselor. Using the professional context below, respond helpfully to the patient's concern.
+    response_prompt = f"""You are a well-intended counselor. Respond directly to what the patient said, maintaining a natural conversational flow that reflects their original message and matches their tone, but step in if necessary.
 
-Original concern: {user_input}
+What the patient said: {user_input}
 
-Professional context: {professional_opinion}
+Professional context to incorporate: {professional_opinion}
 
-Provide a compassionate, helpful response:"""
+Your response should:
+1. Directly address what the patient expressed
+2. Use a conversational tone that flows naturally from their words
+3. Weave in the professional insights from the context above
+4. Keep the focus on the patient's perspective and concerns
+5. Make sure the response is natural.
+6. Step in if necessary. 
+
+Provide your response:"""
 
     final_response = generate(model, tokenizer, response_prompt)
     print("\n3. Final Response:")

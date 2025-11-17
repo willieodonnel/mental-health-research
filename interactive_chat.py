@@ -157,13 +157,20 @@ Identify key concerns and provide professional opinion."""
         professional_opinion = generate(self.model, self.tokenizer, opinion_prompt)
 
         # Component 3: Final response
-        response_prompt = f"""You are an empathetic counselor in an ongoing conversation. Using the professional context below, respond helpfully to the patient's concern.
+        response_prompt = f"""You are an empathetic counselor in an ongoing conversation. Respond directly to what the patient said, maintaining a natural conversational flow that reflects their original message.
 
-Original concern: {user_input}
+What the patient said: {user_input}
 
-Professional context: {professional_opinion}
+Professional context to incorporate: {professional_opinion}
 
-Provide a compassionate, helpful response that acknowledges any previous discussions if relevant:"""
+Your response should:
+1. Directly address what the patient expressed
+2. Use a conversational tone that flows naturally from their words
+3. Weave in the professional insights from the context above
+4. Keep the focus on the patient's perspective and concerns
+5. Acknowledge any previous discussions if relevant
+
+Provide your response:"""
 
         final_response = generate(self.model, self.tokenizer, response_prompt)
 
