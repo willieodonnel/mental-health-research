@@ -1,11 +1,12 @@
 """
-Ablation Testing Script - Compare Full Pipeline vs 2-Component Pipeline
+Ablation Testing Script - Compare Three Pipeline Variants
 
 This script compares:
 1. Full 3-component pipeline (Clinical Description -> Professional Opinion -> Response)
-2. Ablated 2-component pipeline (Input -> Professional Opinion -> Response)
+2. No Clinical pipeline (Input -> Professional Opinion -> Response)
+3. No Professional Opinion pipeline (Clinical Description -> Response)
 
-Both use the EXACT same prompts but the ablated version skips the clinical description step.
+All use the EXACT same prompts for their respective components from pipeline_pieces.py.
 """
 
 import time
@@ -21,7 +22,15 @@ sys.path.insert(0, str(Path(__file__).parent))
 # Import centralized judging functions
 from judging import (
     evaluate_response,
-    print_comparison_results
+    print_comparison_results,
+    METRICS
+)
+
+# Import pipeline components
+from pipeline_pieces import (
+    run_clinical_description,
+    run_professional_opinion,
+    run_final_response
 )
 
 
@@ -46,7 +55,7 @@ def load_model():
     return model, tokenizer
 
 
-def generate(model, tokenizer, prompt, max_length=1024):
+def generate(model, tokenizer, prompt):
     """Generate response using Mistral."""
     # Format in Mistral instruction format
     formatted_prompt = f"[INST] {prompt} [/INST]"
@@ -59,7 +68,7 @@ def generate(model, tokenizer, prompt, max_length=1024):
     with torch.no_grad():
         outputs = model.generate(
             **inputs,
-            max_length=max_length,
+            max_new_tokens=2048,
             temperature=0.7,
             do_sample=True,
             top_p=0.95
@@ -87,35 +96,17 @@ def run_full_pipeline(model, tokenizer, user_input):
     start_time = time.time()
 
     # Component 1: Convert to third-person clinical language
-    clinical_prompt = f"""Convert this to third-person clinical language:
-"{user_input}"
-
-Change "I" to "The patient", keep it concise and clinical."""
-
-    clinical_description = generate(model, tokenizer, clinical_prompt)
+    clinical_description = run_clinical_description(model, tokenizer, generate, user_input)
     print("\n1. Clinical Description:")
     print(clinical_description)
 
-    # Component 2: Professional opinion
-    opinion_prompt = f"""As a mental health professional, provide a brief assessment of:
-{clinical_description}
-
-Identify key concerns and provide professional opinion."""
-
-    professional_opinion = generate(model, tokenizer, opinion_prompt)
+    # Component 2: Professional opinion from clinical description
+    professional_opinion = run_professional_opinion(model, tokenizer, generate, clinical_description)
     print("\n2. Professional Opinion:")
     print(professional_opinion)
 
-    # Component 3: Final response - EXACT same prompt as main_pipeline.py
-    response_prompt = f"""You are an empathetic counselor. Using the professional context below, respond helpfully to the patient's concern.
-
-Original concern: {user_input}
-
-Professional context: {professional_opinion}
-
-Provide a compassionate, helpful response:"""
-
-    final_response = generate(model, tokenizer, response_prompt)
+    # Component 3: Final response using professional context
+    final_response = run_final_response(model, tokenizer, generate, user_input, professional_opinion, "professional")
     print("\n3. Final Response:")
     print(final_response)
 
@@ -131,39 +122,25 @@ Provide a compassionate, helpful response:"""
     }
 
 
-def run_ablated_pipeline(model, tokenizer, user_input):
+def run_no_clinical_pipeline(model, tokenizer, user_input):
     """
-    Run the ABLATED 2-component pipeline on user input.
+    Run the NO CLINICAL 2-component pipeline on user input.
     Components: Input -> Professional Opinion -> Response
     (Skips the clinical description step)
     """
     print("\n" + "="*60)
-    print("RUNNING ABLATED 2-COMPONENT PIPELINE")
+    print("RUNNING NO CLINICAL PIPELINE (2 Components)")
     print("="*60)
 
     start_time = time.time()
 
-    # Component 1 (was 2): Professional opinion - directly from user input
-    # Using user input instead of clinical description
-    opinion_prompt = f"""As a mental health professional, provide a brief assessment of:
-{user_input}
-
-Identify key concerns and provide professional opinion."""
-
-    professional_opinion = generate(model, tokenizer, opinion_prompt)
+    # Component 1: Professional opinion directly from user input
+    professional_opinion = run_professional_opinion(model, tokenizer, generate, user_input)
     print("\n1. Professional Opinion (Direct from Input):")
     print(professional_opinion)
 
-    # Component 2 (was 3): Final response - EXACT same prompt structure
-    response_prompt = f"""You are an empathetic counselor. Using the professional context below, respond helpfully to the patient's concern.
-
-Original concern: {user_input}
-
-Professional context: {professional_opinion}
-
-Provide a compassionate, helpful response:"""
-
-    final_response = generate(model, tokenizer, response_prompt)
+    # Component 2: Final response using professional context
+    final_response = run_final_response(model, tokenizer, generate, user_input, professional_opinion, "professional")
     print("\n2. Final Response:")
     print(final_response)
 
@@ -174,32 +151,168 @@ Provide a compassionate, helpful response:"""
         "professional_opinion": professional_opinion,
         "final_response": final_response,
         "generation_time": generation_time,
-        "pipeline_type": "ablated_2_components"
+        "pipeline_type": "no_clinical_2_components"
     }
+
+
+def run_no_opinion_pipeline(model, tokenizer, user_input):
+    """
+    Run the NO PROFESSIONAL OPINION 2-component pipeline on user input.
+    Components: Clinical Description -> Response
+    (Skips the professional opinion step)
+    """
+    print("\n" + "="*60)
+    print("RUNNING NO PROFESSIONAL OPINION PIPELINE (2 Components)")
+    print("="*60)
+
+    start_time = time.time()
+
+    # Component 1: Convert to third-person clinical language
+    clinical_description = run_clinical_description(model, tokenizer, generate, user_input)
+    print("\n1. Clinical Description:")
+    print(clinical_description)
+
+    # Component 2: Final response using clinical context
+    final_response = run_final_response(model, tokenizer, generate, user_input, clinical_description, "clinical")
+    print("\n2. Final Response:")
+    print(final_response)
+
+    generation_time = time.time() - start_time
+
+    return {
+        "user_input": user_input,
+        "clinical_description": clinical_description,
+        "final_response": final_response,
+        "generation_time": generation_time,
+        "pipeline_type": "no_opinion_2_components"
+    }
+
+
+def print_three_way_comparison(
+    eval1: Dict[str, Any],
+    eval2: Dict[str, Any],
+    eval3: Dict[str, Any]
+) -> None:
+    """
+    Print a formatted comparison of three pipeline evaluations.
+
+    Args:
+        eval1: Full pipeline evaluation results
+        eval2: No Clinical pipeline evaluation results
+        eval3: No Opinion pipeline evaluation results
+    """
+    print("\n" + "="*90)
+    print("THREE-WAY ABLATION COMPARISON")
+    print("="*90)
+
+    # Define names
+    name1 = "Full (3-comp)"
+    name2 = "No Clinical"
+    name3 = "No Opinion"
+
+    # Print header
+    print(f"\n{'Metric':<35} {name1:>15} {name2:>15} {name3:>15}")
+    print("-" * 90)
+
+    # Print each metric score
+    for metric in METRICS:
+        score1 = eval1['scores'][metric]
+        score2 = eval2['scores'][metric]
+        score3 = eval3['scores'][metric]
+
+        # Find the best score
+        max_score = max(score1, score2, score3)
+
+        # Add checkmarks to best score(s)
+        str1 = f"{score1}/10 ✓" if score1 == max_score else f"{score1}/10"
+        str2 = f"{score2}/10 ✓" if score2 == max_score else f"{score2}/10"
+        str3 = f"{score3}/10 ✓" if score3 == max_score else f"{score3}/10"
+
+        print(f"{metric:<35} {str1:>15} {str2:>15} {str3:>15}")
+
+    # Print overall average
+    print("-" * 90)
+    avg1 = eval1['average']
+    avg2 = eval2['average']
+    avg3 = eval3['average']
+
+    max_avg = max(avg1, avg2, avg3)
+
+    avg1_str = f"{avg1:.2f}/10 ✓" if avg1 == max_avg else f"{avg1:.2f}/10"
+    avg2_str = f"{avg2:.2f}/10 ✓" if avg2 == max_avg else f"{avg2:.2f}/10"
+    avg3_str = f"{avg3:.2f}/10 ✓" if avg3 == max_avg else f"{avg3:.2f}/10"
+
+    print(f"{'OVERALL AVERAGE':<35} {avg1_str:>15} {avg2_str:>15} {avg3_str:>15}")
+    print("="*90)
+
+    # Print winner summary
+    scores_dict = {
+        name1: avg1,
+        name2: avg2,
+        name3: avg3
+    }
+
+    sorted_scores = sorted(scores_dict.items(), key=lambda x: x[1], reverse=True)
+    winner_name, winner_score = sorted_scores[0]
+
+    # Check for ties
+    winners = [name for name, score in sorted_scores if score == winner_score]
+
+    if len(winners) > 1:
+        print(f"\nTIE: {' and '.join(winners)} (all scored {winner_score:.2f}/10)")
+    else:
+        second_score = sorted_scores[1][1]
+        diff = winner_score - second_score
+        print(f"\nWINNER: {winner_name} (scored {winner_score:.2f}/10, {diff:.2f} points ahead)")
+
+    # Print ablation insights
+    print("\n" + "="*90)
+    print("ABLATION INSIGHTS")
+    print("="*90)
+
+    clinical_impact = avg1 - avg3  # Full vs No Opinion (difference shows clinical step value)
+    opinion_impact = avg1 - avg2   # Full vs No Clinical (difference shows opinion step value)
+
+    print(f"\nClinical Description Impact: {clinical_impact:+.2f} points")
+    if clinical_impact > 0.5:
+        print("  → Clinical description step adds significant value")
+    elif clinical_impact < -0.5:
+        print("  → Clinical description step may hurt performance")
+    else:
+        print("  → Clinical description step has minimal impact")
+
+    print(f"\nProfessional Opinion Impact: {opinion_impact:+.2f} points")
+    if opinion_impact > 0.5:
+        print("  → Professional opinion step adds significant value")
+    elif opinion_impact < -0.5:
+        print("  → Professional opinion step may hurt performance")
+    else:
+        print("  → Professional opinion step has minimal impact")
+
+    print("\n" + "="*90)
 
 
 def ablation_test(user_input: str):
     """
-    Main ablation testing function that runs both pipeline versions and evaluates them.
+    Main ablation testing function that runs all three pipeline versions and evaluates them.
 
     Args:
         user_input: The mental health question/concern from the user
     """
     print("\n" + "="*80)
-    print("ABLATION STUDY: Full vs Ablated Pipeline")
+    print("ABLATION STUDY: Comparing Three Pipeline Variants")
     print("="*80)
     print(f"\nUser Input: {user_input}")
 
-    # Load model once for both pipelines
+    # Load model once for all pipelines
     model, tokenizer = load_model()
 
-    # Run full 3-component pipeline
+    # Run all three pipeline variants
     full_result = run_full_pipeline(model, tokenizer, user_input)
+    no_clinical_result = run_no_clinical_pipeline(model, tokenizer, user_input)
+    no_opinion_result = run_no_opinion_pipeline(model, tokenizer, user_input)
 
-    # Run ablated 2-component pipeline
-    ablated_result = run_ablated_pipeline(model, tokenizer, user_input)
-
-    # Evaluate both responses
+    # Evaluate all three responses
     print("\n" + "="*60)
     print("EVALUATION PHASE")
     print("="*60)
@@ -210,28 +323,20 @@ def ablation_test(user_input: str):
         "Full 3-Component Pipeline"
     )
 
-    ablated_eval = evaluate_response(
+    no_clinical_eval = evaluate_response(
         user_input,
-        ablated_result['final_response'],
-        "Ablated 2-Component Pipeline"
+        no_clinical_result['final_response'],
+        "No Clinical Pipeline"
     )
 
-    # Print comparison results using centralized function
-    print_comparison_results(
-        full_eval,
-        ablated_eval,
-        "Full (3-comp)",
-        "Ablated (2-comp)",
-        "ABLATION STUDY RESULTS"
+    no_opinion_eval = evaluate_response(
+        user_input,
+        no_opinion_result['final_response'],
+        "No Professional Opinion Pipeline"
     )
 
-    # Print ablation-specific insights
-    if full_eval['average'] > ablated_eval['average']:
-        print("\nThe clinical description step adds value to the pipeline!")
-    elif ablated_eval['average'] > full_eval['average']:
-        print("The clinical description step may not be necessary!")
-    else:
-        print("The clinical description step has neutral impact.")
+    # Print three-way comparison
+    print_three_way_comparison(full_eval, no_clinical_eval, no_opinion_eval)
 
     return {
         'user_input': user_input,
@@ -239,9 +344,13 @@ def ablation_test(user_input: str):
             'result': full_result,
             'evaluation': full_eval
         },
-        'ablated_pipeline': {
-            'result': ablated_result,
-            'evaluation': ablated_eval
+        'no_clinical_pipeline': {
+            'result': no_clinical_result,
+            'evaluation': no_clinical_eval
+        },
+        'no_opinion_pipeline': {
+            'result': no_opinion_result,
+            'evaluation': no_opinion_eval
         }
     }
 
@@ -250,7 +359,7 @@ def main():
     """Main function to run the ablation study."""
     import argparse
 
-    parser = argparse.ArgumentParser(description='Ablation Study: Full vs Ablated Pipeline')
+    parser = argparse.ArgumentParser(description='Ablation Study: Three-Way Pipeline Comparison')
     parser.add_argument('--input', type=str,
                        help='User input to test (optional, will prompt if not provided)')
 
@@ -261,15 +370,17 @@ def main():
     else:
         # Interactive mode
         print("\n" + "="*80)
-        print("ABLATION STUDY TOOL")
+        print("ABLATION STUDY TOOL - THREE-WAY COMPARISON")
         print("="*80)
         print("\nThis tool will:")
         print("1. Run your input through the FULL 3-component pipeline")
         print("   (Clinical Description -> Professional Opinion -> Response)")
-        print("2. Run your input through the ABLATED 2-component pipeline")
+        print("2. Run your input through the NO CLINICAL 2-component pipeline")
         print("   (Input -> Professional Opinion -> Response)")
-        print("3. Use GPT-4 Turbo to evaluate both responses")
-        print("4. Show you which pipeline performs better")
+        print("3. Run your input through the NO PROFESSIONAL OPINION 2-component pipeline")
+        print("   (Clinical Description -> Response)")
+        print("4. Use GPT-4 Turbo to evaluate all three responses")
+        print("5. Show you which pipeline performs best")
         print("\nEnter 'quit' to exit\n")
 
         while True:
