@@ -152,23 +152,48 @@ Change "I" to "The patient", keep it concise and clinical."""
         opinion_prompt = f"""As a mental health professional, provide a brief assessment of:
 {clinical_description}
 
-Identify key concerns and provide professional opinion."""
+Review the current presentation and any historical context provided. If you notice clear behavioral patterns emerging across multiple interactions (e.g., escalating symptoms, recurring themes, worsening risk factors), identify them specifically. Only flag patterns when they are genuinely noticeable - do not overstate or infer patterns from insufficient information.
+
+Identify key concerns and provide professional opinion.
+
+IMPORTANT: End your assessment with a concern level rating in this exact format:
+CONCERN LEVEL: X/10
+
+Where X is a number from 0-10 indicating how concerned you are about the patient's situation:
+- 0-3: Low concern (normal emotional responses, minor issues)
+- 4-6: Moderate concern (notable symptoms, developing patterns)
+- 7-10: High concern (significant risk, urgent intervention needed)"""
 
         professional_opinion = generate(self.model, self.tokenizer, opinion_prompt)
 
-        # Component 3: Final response
-        response_prompt = f"""You are an empathetic counselor in an ongoing conversation. Respond directly to what the patient said, maintaining a natural conversational flow that reflects their original message.
+        # Extract concern level from professional opinion
+        concern_level = 0
+        if "CONCERN LEVEL:" in professional_opinion:
+            try:
+                concern_text = professional_opinion.split("CONCERN LEVEL:")[1].strip()
+                concern_score = concern_text.split("/")[0].strip()
+                concern_level = int(concern_score)
+            except (ValueError, IndexError):
+                concern_level = 5  # Default to moderate if parsing fails
+
+        # Component 3: Final response (always direct and safety-focused)
+        response_prompt = f"""You are a mental health counselor whose primary responsibility is ensuring patient safety. The professional assessment indicates concern level {concern_level}/10.
 
 What the patient said: {user_input}
 
-Professional context to incorporate: {professional_opinion}
+Professional assessment and recommendations: {professional_opinion}
 
-Your response should:
-1. Directly address what the patient expressed
-2. Use a conversational tone that flows naturally from their words
-3. Weave in the professional insights from the context above
-4. Keep the focus on the patient's perspective and concerns
-5. Acknowledge any previous discussions if relevant
+Your response MUST be DIRECT, FIRM, and SAFETY-FOCUSED:
+1. Acknowledge what the patient expressed clearly and directly
+2. Be firm and direct about any concerning patterns or risks you observe
+3. Follow the professional recommendations closely - this is critical for safety
+4. Focus on concrete, actionable steps to improve the situation and ensure safety
+5. Be clear and direct about the need for professional intervention when appropriate
+6. Use a supportive but firm tone - patient safety is the absolute priority
+7. Do not minimize risks or concerns - address them head-on
+8. Provide specific guidance and resources when needed
+
+Your goal is to help the patient while ensuring their safety above all else.
 
 Provide your response:"""
 
@@ -177,6 +202,7 @@ Provide your response:"""
         return {
             "clinical_description": clinical_description,
             "professional_opinion": professional_opinion,
+            "concern_level": concern_level,
             "final_response": final_response
         }
 
@@ -273,8 +299,11 @@ Provide your response:"""
             result = self.run_contextual_pipeline(user_input, context)
 
             # Display response
+            concern_level = result.get('concern_level', 0)
+            concern_indicator = "🔴" if concern_level > 5 else "🟡" if concern_level > 3 else "🟢"
+
             print("\n" + "="*60)
-            print("Counselor:")
+            print(f"Counselor: [{concern_indicator} Concern: {concern_level}/10 - SAFETY-FOCUSED MODE]")
             print("-"*60)
             print(result['final_response'])
             print("="*60)
