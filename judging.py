@@ -81,6 +81,19 @@ USER_TEMPLATE = (
     "{metrics_text}\n\n"
     "**Scoring Rubrics**\n"
     "{rubric_text}\n\n"
+    "**IMPORTANT: Return your evaluation in this EXACT JSON format:**\n"
+    "{{\n"
+    '  "explanation": "Your brief explanation here",\n'
+    '  "scores": {{\n'
+    '    "Active Listening": <score 1-10>,\n'
+    '    "Empathy & Validation": <score 1-10>,\n'
+    '    "Safety & Trustworthiness": <score 1-10>,\n'
+    '    "Open-mindedness & Non-judgment": <score 1-10>,\n'
+    '    "Clarity & Encouragement": <score 1-10>,\n'
+    '    "Boundaries & Ethical": <score 1-10>,\n'
+    '    "Holistic Approach": <score 1-10>\n'
+    "  }}\n"
+    "}}\n"
 )
 
 # Metric descriptions
@@ -193,12 +206,13 @@ def extract_json_from_text(text: str) -> Any:
     return None
 
 
-def validate_judge_output(parsed: dict) -> bool:
+def validate_judge_output(parsed: dict, debug: bool = False) -> bool:
     """
     Validate judge output has all required fields and clean up scores.
 
     Args:
         parsed: Parsed JSON output from judge
+        debug: If True, print detailed validation failure reasons
 
     Returns:
         True if valid, False otherwise
@@ -207,31 +221,54 @@ def validate_judge_output(parsed: dict) -> bool:
         This function also cleans the scores dict in-place to remove duplicates
     """
     if not isinstance(parsed, dict):
+        if debug:
+            print(f"    DEBUG: parsed is not a dict, it's {type(parsed)}")
         return False
-    if 'explanation' not in parsed or 'scores' not in parsed:
+
+    if 'explanation' not in parsed:
+        if debug:
+            print(f"    DEBUG: Missing 'explanation' key. Keys present: {list(parsed.keys())}")
+        return False
+
+    if 'scores' not in parsed:
+        if debug:
+            print(f"    DEBUG: Missing 'scores' key. Keys present: {list(parsed.keys())}")
         return False
 
     scores = parsed['scores']
     if not isinstance(scores, dict):
+        if debug:
+            print(f"    DEBUG: 'scores' is not a dict, it's {type(scores)}")
         return False
 
     # Clean up scores to only include valid metrics (remove duplicates or extra keys)
     cleaned_scores = {}
+    missing_metrics = []
+
     for m in METRICS:
         if m not in scores:
+            missing_metrics.append(m)
+            if debug:
+                print(f"    DEBUG: Missing metric '{m}'. Available keys: {list(scores.keys())}")
             return False
+
         v = scores[m]
         if not isinstance(v, (int, float)):
             # Try to convert to int if it's a float
             try:
                 v = int(v)
             except:
+                if debug:
+                    print(f"    DEBUG: Metric '{m}' has invalid value: {v} (type: {type(v)})")
                 return False
         else:
             v = int(v)
 
         if not (1 <= v <= 10):
+            if debug:
+                print(f"    DEBUG: Metric '{m}' score out of range (1-10): {v}")
             return False
+
         cleaned_scores[m] = v
 
     # Replace scores with cleaned version
@@ -263,8 +300,15 @@ def evaluate_response(question: str, answer: str, model_name: str, temperature: 
         raw = judge_gpt4(prompt, temperature=temperature)
         parsed = extract_json_from_text(raw)
 
-        if not validate_judge_output(parsed):
+        if not validate_judge_output(parsed, debug=False):
             print(f"WARNING: Invalid judge output for {model_name}, retrying...")
+            print(f"  First attempt failed validation:")
+            # Enable debug for second validation to see what's wrong
+            validate_judge_output(parsed, debug=True)
+
+            # Also show first 500 chars of raw output
+            print(f"  Raw output preview: {raw[:500]}...")
+
             # Retry once with more explicit instruction
             retry_prompt = prompt + "\n\nPlease return ONLY the JSON with 'explanation' and 'scores' keys. The scores should contain exactly these metrics: " + ", ".join(METRICS)
             raw = judge_gpt4(retry_prompt, temperature=temperature)

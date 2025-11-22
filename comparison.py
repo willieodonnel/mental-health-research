@@ -14,7 +14,7 @@ from pathlib import Path
 
 # Import local modules
 sys.path.insert(0, str(Path(__file__).parent))
-from finetuned_inference import load_model as load_finetuned, generate as generate_finetuned
+from finetuned_mentalchat_model import load_model as load_finetuned, generate as generate_finetuned
 from main_pipeline import run_pipeline
 
 # Import centralized judging functions

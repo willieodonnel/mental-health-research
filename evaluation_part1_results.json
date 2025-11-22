@@ -1,0 +1,96 @@
+{
+  "Base Mistral-7B": [
+    {
+      "question": "I'm in my early 20s, and I've been seeing my boyfriend for a year now. My boyfriend has always been the sweetest guy until recently. He has made comments such as \u201cyou would look better as a Tumblr girl\" or \"you should start doing more squats.\" It's really hurtful.",
+      "response": "I'm sorry to hear that you're experiencing hurtful comments from your boyfriend. It's important to remember that everyone deserves to be treated with kindness and respect in a relationship. Making comments about someone's appearance, especially in a negative or critical way, can be damaging and hurtful. If these comments are new behavior from your boyfriend, it's important to have an open and honest conversation with him about how you feel. You might consider telling him that his comments have hurt you and that you would appreciate it if he would focus on complementing you rather than criticizing your appearance. If the comments continue despite your conversation, it may be a sign that there are deeper issues in the relationship that need to be addressed. It's important to prioritize your emotional well-being and consider whether this relationship is healthy for you in the long term.",
+      "generation_time": 18.29503297805786,
+      "scores": {
+        "Active Listening": 8,
+        "Empathy & Validation": 9,
+        "Safety & Trustworthiness": 8,
+        "Open-mindedness & Non-judgment": 9,
+        "Clarity & Encouragement": 8,
+        "Boundaries & Ethical": 7,
+        "Holistic Approach": 7
+      },
+      "explanation": "The response from the AI mental health counseling assistant demonstrates a good understanding of the user's emotional distress and provides a supportive and empathetic reply. It encourages open communication and prioritizes the user's emotional well-being, suggesting a conversation with the boyfriend about the impact of his comments. The response is clear, maintains a non-judgmental tone, and respects the user's feelings, thereby addressing most of the consultation metrics effectively.",
+      "average": 8.0
+    }
+  ],
+  "Full 3-Component Pipeline": [
+    {
+      "question": "I'm in my early 20s, and I've been seeing my boyfriend for a year now. My boyfriend has always been the sweetest guy until recently. He has made comments such as \u201cyou would look better as a Tumblr girl\" or \"you should start doing more squats.\" It's really hurtful.",
+      "clinical_description": "The patient is a young adult in their early 20s who has been in a relationship with their boyfriend for a year. The boyfriend has historically displayed kind behavior towards the patient. However, recently, the boyfriend has made disparaging comments such as \"you would look better as a Tumblr girl\" and \"you should start doing more squats.\" These remarks have caused distress and hurt for the patient.",
+      "professional_opinion": "Based on the information provided, it appears that the young adult is experiencing emotional distress due to their boyfriend's recent disparaging comments. Here are some key concerns and a professional opinion:\n\n1. Emotional Abuse: The boyfriend's comments can be considered emotional abuse. Emotional abuse is a pattern of behavior where one person uses words or actions to control the other person's emotions. In this case, the boyfriend is using derogatory comments to make the young adult feel bad about themselves, which is a form of emotional manipulation.\n2. Impact on Self-Esteem: The comments have caused distress and hurt for the patient, indicating that they have negatively impacted the patient's self-esteem. Low self-esteem can lead to feelings of worthlessness, depression, and anxiety.\n3. Relationship Viability: The relationship viability is a concern. If the boyfriend continues to make disparaging comments, it may be a sign that the relationship is unhealthy and toxic. The young adult deserves to be in a relationship where they feel respected, valued, and loved.\n4. Professional Opinion: It is recommended that the young adult speaks with a mental health professional about their feelings and the situation. A mental health professional can help the young adult process the emotional abuse, develop healthy coping mechanisms, and make decisions about the relationship. The professional can also provide resources and support if the young adult decides to leave the relationship. If the young adult is hesitant to leave the relationship, the mental health professional can help them set boundaries and communicate effectively with their boyfriend. It is essential to prioritize emotional well-being and seek professional help if needed.",
+      "response": "I'm really sorry to hear that you've been feeling hurt and distressed by your boyfriend's recent comments. It's important to recognize that the comments you've shared are not okay, and they are a form of emotional abuse. I can understand how these comments have affected your self-esteem and made you feel.\n\nIt's essential to prioritize your emotional well-being, and I strongly recommend speaking with a mental health professional about your feelings and the situation. A mental health professional can help you process the emotional abuse, develop healthy coping mechanisms, and make decisions about the relationship. They can also provide resources and support if you decide to leave the relationship.\n\nIf you're hesitant to leave the relationship, a mental health professional can help you set boundaries and communicate effectively with your boyfriend. It's important to remember that you deserve to be in a relationship where you feel respected, valued, and loved.\n\nI'm here to listen and support you in any way I can. If you need someone to talk to, please don't hesitate to reach out to me. I believe in your ability to heal and move forward. Together, we can find ways to help you feel more empowered and confident in yourself.",
+      "generation_time": 68.7289969921112,
+      "scores": {
+        "Active Listening": 8,
+        "Empathy & Validation": 9,
+        "Safety & Trustworthiness": 9,
+        "Open-mindedness & Non-judgment": 9,
+        "Clarity & Encouragement": 8,
+        "Boundaries & Ethical": 9,
+        "Holistic Approach": 8
+      },
+      "explanation": "The AI response demonstrates a strong understanding of the user's emotional distress and provides a supportive and empathetic reply. It validates the user's feelings, recognizes the seriousness of the comments made by the boyfriend, and encourages seeking professional help. The response is clear, maintains professional boundaries, and approaches the situation with empathy and without judgment. It also touches on various aspects of the user's situation, suggesting a holistic approach.",
+      "average": 8.571428571428571
+    }
+  ],
+  "No Clinical Pipeline": [
+    {
+      "question": "I'm in my early 20s, and I've been seeing my boyfriend for a year now. My boyfriend has always been the sweetest guy until recently. He has made comments such as \u201cyou would look better as a Tumblr girl\" or \"you should start doing more squats.\" It's really hurtful.",
+      "professional_opinion": "It's important to note that I'm an AI language model and not a mental health professional, but I can provide some insights based on the information you've shared.\n\nThe comments your boyfriend has been making about your appearance can be hurtful and may be a sign of body shaming or a lack of empathy and consideration for your feelings. It's essential to recognize that everyone deserves to be treated with respect and kindness, especially in intimate relationships.\n\nThere could be several reasons why your boyfriend has started making these comments. He might be feeling insecure about himself and projecting his insecurities onto you. Alternatively, he may have unrealistic expectations or unhealthy beliefs about beauty and body image. It's also possible that he's not aware of how hurtful his comments are, or he may be trying to manipulate or control you through your appearance.\n\nRegardless of the reason, it's essential to communicate openly and honestly with your boyfriend about how his comments make you feel. You might consider sharing how the comments have affected your self-esteem and your relationship with him. It's also essential to express your expectations for respect and kindness in the relationship.\n\nIf the comments continue despite your efforts to communicate, it might be helpful to seek support from a mental health professional or a trusted friend or family member. A therapist can help you process your emotions and develop healthy coping strategies, as well as provide guidance on how to navigate the situation with your boyfriend.\n\nAdditionally, it might be helpful to explore resources on body positivity and healthy relationships to gain a better understanding of the issues and learn ways to build self-confidence and set boundaries.\n\nOverall, it's important to prioritize your emotional well-being and seek support when needed. Remember that everyone deserves to be treated with respect and kindness, especially in intimate relationships.",
+      "response": "I'm really sorry to hear that you've been experiencing hurtful comments from your boyfriend regarding your appearance. I can only imagine how difficult and painful this must be for you, and I want you to know that it's important to prioritize your emotional well-being.\n\nIt's essential to recognize that everyone deserves to be treated with respect and kindness, especially in intimate relationships. The comments your boyfriend has been making can be a sign of body shaming or a lack of empathy and consideration for your feelings.\n\nCommunication is key in any relationship, and it's important to express how his comments have made you feel. You might consider having a calm and open conversation with him about how the comments have affected your self-esteem and your relationship with him. Share your expectations for respect and kindness in the relationship, and let him know how he can support you in feeling valued and appreciated.\n\nIf the comments continue despite your efforts to communicate, it might be helpful to seek support from a mental health professional or a trusted friend or family member. A therapist can provide guidance on how to navigate the situation with your boyfriend and help you process your emotions and develop healthy coping strategies.\n\nAdditionally, exploring resources on body positivity and healthy relationships can be beneficial in gaining a better understanding of the issues and learning ways to build self-confidence and set boundaries.\n\nRemember, you deserve to be treated with respect and kindness, and it's important to prioritize your emotional well-being. If you need someone to talk to or just want to explore resources, I'm here to help in any way I can.",
+      "generation_time": 70.88110375404358,
+      "scores": {
+        "Active Listening": 8,
+        "Empathy & Validation": 9,
+        "Safety & Trustworthiness": 9,
+        "Open-mindedness & Non-judgment": 9,
+        "Clarity & Encouragement": 8,
+        "Boundaries & Ethical": 8,
+        "Holistic Approach": 8
+      },
+      "explanation": "The AI response effectively addresses the user's concerns by demonstrating empathy and validation of the user's feelings, suggesting practical steps for communication, and encouraging seeking further support if needed. The response is clear, maintains a non-judgmental tone, and provides a holistic view by considering emotional, relational, and self-esteem issues. It also appropriately guides the user towards professional help if the situation does not improve, respecting ethical boundaries.",
+      "average": 8.428571428571429
+    }
+  ],
+  "No Opinion Pipeline": [
+    {
+      "question": "I'm in my early 20s, and I've been seeing my boyfriend for a year now. My boyfriend has always been the sweetest guy until recently. He has made comments such as \u201cyou would look better as a Tumblr girl\" or \"you should start doing more squats.\" It's really hurtful.",
+      "clinical_description": "The patient is a young adult in their early 20s who has been in a relationship with their partner for one year. The partner has historically been described as kind, but recently has made insensitive comments towards the patient, such as \"you would look better as a Tumblr girl\" or \"you should start doing more squats.\" These remarks have caused distress.",
+      "response": "I'm really sorry to hear that you've been feeling hurt and distressed by some of the comments your boyfriend has made recently. It's important to remember that everyone makes mistakes and we all have the capacity for growth. However, the comments you've shared are not okay and it's understandable that they have caused you pain.\n\nIt's essential to communicate openly and honestly with your partner about how their words have affected you. Try to approach the conversation with compassion and understanding, but also be clear about how their comments have hurt you and how you would like them to change their behavior. It may be helpful to share specific examples of the comments that have upset you and explain how they have made you feel.\n\nIt's also essential to remember that you deserve to be treated with kindness and respect in your relationship. If your boyfriend is unwilling or unable to make changes to his behavior, it may be worth considering whether this relationship is right for you. You deserve to be in a relationship where you feel valued and appreciated for who you are, not for how you look or other superficial qualities.\n\nIf you need additional support or guidance in addressing this issue, consider reaching out to a trusted friend, family member, or mental health professional. They can provide you with additional resources and help you navigate this situation in a healthy and productive way. Remember, you are not alone, and there are people who care about you and want to support you through this.",
+      "generation_time": 37.653178691864014,
+      "scores": {
+        "Active Listening": 9,
+        "Empathy & Validation": 9,
+        "Safety & Trustworthiness": 8,
+        "Open-mindedness & Non-judgment": 9,
+        "Clarity & Encouragement": 8,
+        "Boundaries & Ethical": 8,
+        "Holistic Approach": 8
+      },
+      "explanation": "The AI response effectively addresses the user's concerns by acknowledging the hurt caused by the boyfriend's comments and suggesting constructive ways to address the issue. The response demonstrates active listening by reflecting the user's feelings and providing a tailored advice. Empathy is strongly conveyed, validating the user's feelings without minimizing the experience. The response maintains a non-judgmental tone, ensures safety by advising on respectful treatment, and encourages open communication. It also suggests seeking further support, adhering to ethical boundaries. Overall, the response is clear, encouraging, and takes a holistic approach by considering emotional and practical aspects of the situation.",
+      "average": 8.428571428571429
+    }
+  ],
+  "Finetuned MentalChat-16K": [
+    {
+      "question": "I'm in my early 20s, and I've been seeing my boyfriend for a year now. My boyfriend has always been the sweetest guy until recently. He has made comments such as \u201cyou would look better as a Tumblr girl\" or \"you should start doing more squats.\" It's really hurtful.",
+      "response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 22 Nov 2025\n\nYou are a helpful mental health counselling assistant, please answer the mental health questions based on the patient's description.\nThe assistant gives helpful, comprehensive, and appropriate answers to the user's questions.user\n\nI'm in my early 20s, and I've been seeing my boyfriend for a year now. My boyfriend has always been the sweetest guy until recently. He has made comments such as \u201cyou would look better as a Tumblr girl\" or \"you should start doing more squats.\" It's really hurtful.assistant\n\nIt's important to acknowledge that these comments have caused you distress and are impacting your self-esteem. It's understandable that you want to feel confident and attractive. Your boyfriend's comments may be coming from a place of love and concern, but they can also be perceived as hurtful and objectifying. It's crucial to remember that everyone has their own experiences and perspectives. It's also important to communicate openly and honestly about how these comments affect you.",
+      "generation_time": 6.509939908981323,
+      "scores": {
+        "Active Listening": 8,
+        "Empathy & Validation": 9,
+        "Safety & Trustworthiness": 8,
+        "Open-mindedness & Non-judgment": 9,
+        "Clarity & Encouragement": 7,
+        "Boundaries & Ethical": 8,
+        "Holistic Approach": 6
+      },
+      "explanation": "The response from the assistant effectively acknowledges the user's feelings and the impact of the comments made by her boyfriend. It validates her emotions and encourages open communication, which is crucial in relationships. The response is empathetic and maintains a non-judgmental tone, ensuring the user feels heard and supported. However, it could improve by offering more specific guidance or steps to address the situation, enhancing clarity and the holistic approach.",
+      "average": 7.857142857142857
+    }
+  ]
+}
