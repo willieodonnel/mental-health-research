@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Data and models (these will be downloaded fresh on Modal)
+*.json
+*.jsonl
+*.csv
+*.tsv
+*.parquet
+
+# Model cache
+.cache/
+huggingface/
+transformers_cache/
+
+# Results and logs
+*.log
+results/
+outputs/
+evaluation_results*.json
+psychosis_bench_results*.json
+
+# README and docs
+README.md
+*.md
+
+# Backup files
+*.backup
+*.bak
+
+# OS
+.DS_Store
+Thumbs.db

@@ -10,12 +10,13 @@
 # Your current setup: PyTorch 2.8.0+cu128 (nightly build) - Already configured!
 # =============================================================================
 
-# Core dependencies
+# Core ML dependencies
 transformers>=4.35.0
 accelerate>=0.24.0
 bitsandbytes>=0.41.0
+peft>=0.7.0
 
-# Optional but recommended
+# Model tokenizers
 sentencepiece>=0.1.99
 protobuf>=3.20.0
 
@@ -23,12 +24,17 @@ protobuf>=3.20.0
 datasets>=2.14.0
 tqdm>=4.66.0
 
-# For GPT-4 evaluation (optional, only needed for evaluation)
+# For multi-judge evaluation (GPT-4, Gemini, Claude)
+openai>=1.6.0
+google-generativeai>=0.3.0
+anthropic>=0.7.0
 langchain>=0.1.0
 langchain-openai>=0.0.5
 langchain-community>=0.0.20
 python-dotenv>=1.0.0
-openai>=1.6.0
+
+# For cloud GPU compute (optional - Modal)
+modal>=0.63.0
 
 # =============================================================================
 # INSTALLATION INSTRUCTIONS FOR RTX 5080
@@ -44,11 +50,16 @@ openai>=1.6.0
 #
 # Step 2: Install Other Dependencies
 # -----------------------------------
-# pip install transformers accelerate bitsandbytes sentencepiece protobuf datasets tqdm
+# pip install -r requirements.txt
 #
-# Step 3: Verify Installation
+# Step 3: Install Modal (Optional - for cloud GPU compute)
+# ---------------------------------------------------------
+# pip install modal
+# modal token new  # Follow prompts to authenticate
+#
+# Step 4: Verify Installation
 # ----------------------------
-# python test_setup.py
+# python -c "import torch; print(f'PyTorch: {torch.__version__}'); print(f'CUDA: {torch.cuda.is_available()}')"
 #
 # Expected output:
 # - PyTorch version: 2.8.0+cu128 (or newer)
@@ -57,10 +68,23 @@ openai>=1.6.0
 # - GPU: NVIDIA GeForce RTX 5080
 #
 # =============================================================================
+# MODAL CLOUD GPU SETUP (Optional)
+# =============================================================================
+# Modal allows running evaluations on cloud GPUs (A10G, A100, etc.)
+#
+# 1. Install Modal: pip install modal
+# 2. Authenticate: modal token new
+# 3. Create secrets in Modal dashboard:
+#    - openai-secret: Add OPENAI_API_KEY
+#    - (optional) Add ANTHROPIC_API_KEY, GEMINI_API_KEY for multi-judge
+# 4. Run on cloud: modal run experiments/evaluation_part1.py --num-questions 10
+#
+# =============================================================================
 # NOTES
 # =============================================================================
 # - CUDA Toolkit 12.8+ should be installed on your system
 # - RTX 5080 has 16GB VRAM - sufficient for FP16 inference (~14GB usage)
 # - 4-bit quantization will use ~3.5GB VRAM
 # - PyTorch nightly updates frequently - reinstall weekly for best performance
+# - Modal is optional - only needed if you want to run evaluations on cloud GPUs
 # =============================================================================

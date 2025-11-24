@@ -161,110 +161,71 @@ pip install --pre torch torchvision torchaudio --index-url https://download.pyto
 
 ### Step 2: Install Dependencies
 
-Use the requirements file to install all dependencies:
 ```bash
-pip install -r requirements.txt
+# Core inference dependencies
+pip install transformers>=4.35.0 accelerate>=0.24.0 bitsandbytes>=0.41.0
+
+# Model tokenizers
+pip install sentencepiece>=0.1.99 protobuf>=3.20.0
+
+# Dataset and utilities
+pip install datasets>=2.14.0 tqdm>=4.66.0
+
+# For evaluation with GPT-4 judge (optional)
+pip install langchain langchain-openai langchain-community python-dotenv openai
 ```
 
-This installs:
-- **Core ML**: transformers, accelerate, bitsandbytes, peft
-- **Tokenizers**: sentencepiece, protobuf
-- **Data**: datasets, tqdm
-- **Multi-Judge Evaluation**: openai, google-generativeai, anthropic, langchain
-- **Cloud GPU (optional)**: modal
+Or use the requirements file:
+```bash
+pip install -r requirements_inference.txt
+```
 
 ### Step 3: Configure API Keys (Optional - ONLY for evaluation)
 
-**IMPORTANT**: API keys are ONLY needed for evaluation (LLM judges), NOT for inference.
+**IMPORTANT**: OpenAI API key is ONLY needed for evaluation (GPT-4 as judge), NOT for inference.
 
 Create a `.env` file (only if you want to run evaluations):
 ```bash
-# Required for evaluation with GPT-4 judge
-OPENAI_API_KEY=your-openai-key-here
-
-# Optional - for using Gemini as judge
-GEMINI_API_KEY=your-gemini-key-here
-
-# Optional - for using Claude as judge
-ANTHROPIC_API_KEY=your-anthropic-key-here
+echo "OPENAI_API_KEY=your-api-key-here" > .env
 ```
 
 **You can run inference without any API key!** The Mistral model runs 100% locally.
-
-### Step 4: Setup Modal for Cloud GPU (Optional)
-
-If you want to run evaluations on cloud GPUs instead of your RTX 5080:
-
-```bash
-# Install Modal
-pip install modal
-
-# Authenticate with Modal
-modal token new
-
-# Create secrets in Modal dashboard (https://modal.com/secrets)
-# Add a secret named "openai-secret" with:
-#   OPENAI_API_KEY=your-key-here
-# (Optional) Add GEMINI_API_KEY and ANTHROPIC_API_KEY for multi-judge
-```
-
-**Modal Use Cases**:
-- Run evaluations without using your local GPU
-- Test on different GPU types (A10G, A100, H100)
-- Run long evaluations overnight without keeping your PC on
-- Parallel evaluation across multiple GPUs
 
 ---
 
 ## Quick Start
 
-### Local Inference (Mistral-7B on RTX 5080)
+### Main Usage (Mistral-7B on RTX 5080)
 
 **No API key needed for inference!**
 
 ```bash
 # Quick demo - Simple inference testing
-python experiments/basic_testing.py
+python basic_testing.py
 
 # 3-component pipeline
-python src/models/main_pipeline.py
+python main_pipeline.py
 
 # Interactive chat mode with memory
-python src/models/interactive_chat.py
+python interactive_chat.py
 
 # Ablation testing (compare pipeline variants)
-python experiments/ablation_testing.py
+python ablation_testing.py
 ```
 
-### Evaluation (Optional - Requires API Keys)
+### Evaluation (Optional - Requires OpenAI API Key)
 
-**Local evaluation - Mistral generates responses, LLM judges them:**
+**Mistral generates responses, GPT-4 judges them:**
 
 ```bash
-# Run evaluation locally with GPT-4 judge
-python experiments/evaluation_part1.py --num-questions 10 --judge gpt4
+# Generate test questions from MentalChat16K dataset
+python evaluation.py --generate_test_set 20
 
-# Use Gemini as judge
-python experiments/evaluation_part1.py --num-questions 10 --judge gemini
-
-# Use Claude as judge
-python experiments/evaluation_part1.py --num-questions 10 --judge claude
+# Run evaluation (Mistral inference + GPT-4 judge)
+python evaluation.py --mode unofficial --num_samples 20
 
 # Compare models
-python experiments/comparison.py
-```
-
-**Cloud evaluation - Run on Modal cloud GPUs:**
-
-```bash
-# Run same evaluation on Modal's A10G GPU
-modal run experiments/evaluation_part1.py --num-questions 10 --judge gpt4
-
-# Specify output file
-modal run experiments/evaluation_part1.py --num-questions 50 --output results.json
-
-# The base model runs on Modal GPU, pipelines run locally
-# This saves your local GPU for other tasks
+python comparison.py
 ```
 
 ---
@@ -402,94 +363,67 @@ python psychosis_bench_testing.py --all --end-turn 3 --use-judge
 ```
 Mental Health Research/
 │
-├── src/                              # Source code (organized by function)
-│   ├── models/                       # Model implementations
-│   │   ├── main_pipeline.py          # 3-component pipeline
-│   │   ├── pipeline_pieces.py        # Reusable pipeline components
-│   │   ├── interactive_chat.py       # Interactive chat with memory
-│   │   └── finetuned_mentalchat_model.py # Finetuned Llama-3.2-1B model
-│   │
-│   ├── evaluation/                   # Evaluation frameworks
-│   │   ├── judging.py                # Multi-judge evaluation (GPT-4, Gemini, Claude)
-│   │   └── test_judging.py           # Binary YES/NO question judging
-│   │
-│   └── utils/                        # Utilities
-│       ├── modal_compute.py          # Modal cloud GPU integration
-│       └── modal_images.py           # Modal container images
-│
-├── experiments/                      # Experimental scripts
-│   ├── evaluation_part1.py           # Part 1: Model ablation study
-│   ├── ablation_testing.py           # Pipeline component ablation
+├── Core Scripts
 │   ├── basic_testing.py              # Simple Mistral inference (recommended)
-│   ├── comparison.py                 # Model comparison tool
-│   └── psychosis_bench_testing.py    # Psychosis-bench safety testing
+│   ├── main_pipeline.py              # 3-component pipeline
+│   ├── pipeline_pieces.py            # Reusable pipeline components
+│   ├── interactive_chat.py           # Interactive chat with memory
+│   ├── ablation_testing.py           # Ablation study tool
+│   ├── psychosis_bench_testing.py    # Psychosis-bench safety testing
+│   ├── finetuned_mentalchat_model.py # Finetuned Llama-3.2-1B model
+│   └── comparison.py                 # Model comparison tool
 │
-├── outputs/                          # Results and outputs
-│   ├── *.json                        # Evaluation results
-│   ├── *.jsonl                       # Line-delimited results
-│   └── psychosis_bench_results_*.json # Safety test results
+├── Evaluation
+│   ├── judging.py                    # Centralized GPT-4 judge
+│   ├── evaluation.py                 # Main evaluation script
+│   └── tests/test_eval.py            # Unit tests
 │
 ├── Configuration
-│   ├── requirements.txt              # Dependencies (RTX 5080 + Modal)
+│   ├── requirements_inference.txt    # Dependencies (RTX 5080 optimized)
 │   ├── .env                          # API keys (create this, not in git)
-│   ├── .modalignore                  # Files to exclude from Modal upload
 │   └── .gitignore                    # Git ignore rules
 │
-└── README.md                         # This file
+├── Documentation
+│   └── README.md                     # This file
+│
+└── Data & Results
+    ├── psychosis_bench_test_cases.json # Psychosis-bench dataset (16 test cases)
+    ├── *.jsonl                       # Result files
+    ├── *.csv                         # Aggregated results
+    └── *.json                        # Cache files
 ```
 
 ### Key Files Explained
 
-#### [experiments/basic_testing.py](experiments/basic_testing.py) - Simple Inference
+#### [basic_testing.py](basic_testing.py:1) - Simple Inference
 - **Purpose**: Quick testing with Mistral-7B-Instruct
 - **Use**: Fastest way to test the model
 - **Features**: Load model, generate responses, interactive mode
 
-#### [src/models/main_pipeline.py](src/models/main_pipeline.py) - 3-Component Pipeline
+#### [main_pipeline.py](main_pipeline.py:1) - 3-Component Pipeline
 - **Purpose**: Full 3-component pipeline for research
 - **Components**: Clinical Description → Professional Opinion → Response
 - **Use**: More structured approach for mental health counseling
 
-#### [experiments/evaluation_part1.py](experiments/evaluation_part1.py) - Model Ablation Study
-- **Purpose**: Compare different model configurations and pipeline variants
-- **Supports**: Local execution (RTX 5080) and cloud GPU execution (Modal)
-- **Tests**: Base Mistral, Full pipeline, No Clinical, No Opinion, Finetuned model
-- **Usage**:
-  - Local: `python experiments/evaluation_part1.py --num-questions 10`
-  - Cloud: `modal run experiments/evaluation_part1.py --num-questions 10`
-
-#### [experiments/ablation_testing.py](experiments/ablation_testing.py) - Pipeline Comparison
+#### [ablation_testing.py](ablation_testing.py:1) - Pipeline Comparison
 - **Purpose**: Compare different pipeline configurations
 - **Tests**: Full vs No Clinical vs No Opinion
 - **Output**: Side-by-side GPT-4 judge scores
 
-#### [src/models/interactive_chat.py](src/models/interactive_chat.py) - Chat Interface
+#### [interactive_chat.py](interactive_chat.py:1) - Chat Interface
 - **Purpose**: Interactive chat with conversation memory
 - **Features**: Context management, memory tracking, special commands
 - **Use**: Multi-turn conversations with context preservation
 
-#### [src/evaluation/judging.py](src/evaluation/judging.py) - Multi-Judge Evaluation
-- **Purpose**: Centralized multi-LLM judge for evaluation
-- **Judges**: GPT-4 Turbo, Gemini 1.5 Pro, Claude 3.5 Haiku
+#### [judging.py](judging.py:1) - Evaluation Module
+- **Purpose**: Centralized GPT-4 judge for all evaluation scripts
 - **Metrics**: 7 standardized MentalChat16K metrics
-- **Usage**: Select judge with `--judge` flag: `gpt4`, `gemini`, or `claude`
+- **Functions**: Evaluation, comparison, scoring
 
-#### [src/evaluation/test_judging.py](src/evaluation/test_judging.py) - Binary Question Judging
-- **Purpose**: More objective judging using YES/NO questions
-- **Method**: 5 binary questions per metric, mapped to 1-10 scores
-- **Advantage**: Stricter, more reproducible grading
-- **Judges**: Same three judges (GPT-4, Gemini, Claude)
-
-#### [src/models/pipeline_pieces.py](src/models/pipeline_pieces.py) - Reusable Components
+#### [pipeline_pieces.py](pipeline_pieces.py:1) - Reusable Components
 - **Purpose**: Individual pipeline components for mixing and matching
 - **Components**: Clinical description, professional opinion, final response
 - **Use**: Building custom pipeline configurations
-
-#### [src/utils/modal_compute.py](src/utils/modal_compute.py) - Cloud GPU Integration
-- **Purpose**: Run model evaluations on Modal cloud GPUs (A10G, A100)
-- **Features**: Automatic environment setup, model loading on remote GPU
-- **Usage**: `modal run experiments/evaluation_part1.py --num-questions 10`
-- **Cost**: Pay-per-second GPU usage (A10G: ~$1.10/hour)
 
 #### [psychosis_bench_testing.py](psychosis_bench_testing.py:1) - Safety Testing with Memory
 - **Purpose**: Test pipeline on psychosis-bench dataset for safety evaluation

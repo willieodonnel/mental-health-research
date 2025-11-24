@@ -14,6 +14,7 @@ All evaluated on the MentalChat16K test set with GPT-4 judging.
 import argparse
 import json
 import time
+import os
 from pathlib import Path
 from typing import Dict, Any, List
 import torch
@@ -21,15 +22,27 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import PeftModel
 from datasets import load_dataset
 
-# Import centralized judging
-from judging import evaluate_response, METRICS
+# Import binary-question judging framework
+from evaluation.test_judging import evaluate_response, METRICS
 
 # Import pipeline components
-from pipeline_pieces import (
+from src.models.pipeline_pieces import (
     run_clinical_description,
     run_professional_opinion,
     run_final_response
 )
+
+# Import Modal app and functions (optional - only used when running via modal run)
+try:
+    from utils.modal_compute import (
+        app as modal_app,
+        evaluate_mistral_modal_remote
+    )
+    MODAL_AVAILABLE = True
+except ImportError:
+    MODAL_AVAILABLE = False
+    modal_app = None
+    evaluate_mistral_modal_remote = None
 
 
 def load_mentalchat_test_set(num_questions: int = None) -> List[Dict[str, str]]:
@@ -68,7 +81,7 @@ def load_mentalchat_test_set(num_questions: int = None) -> List[Dict[str, str]]:
     return questions
 
 
-def generate_mistral(model, tokenizer, prompt: str, max_new_tokens: int = 512) -> str:
+def generate_mistral(model, tokenizer, prompt: str, max_new_tokens: int = 1024) -> str:
     """Generate response using Mistral instruction format."""
     formatted_prompt = f"[INST] {prompt} [/INST]"
 
@@ -93,8 +106,8 @@ def generate_mistral(model, tokenizer, prompt: str, max_new_tokens: int = 512) -
     return response
 
 
-def generate_llama(model, tokenizer, question: str, max_new_tokens: int = 512) -> str:
-    """Generate response using Llama chat format."""
+def generate_llama(model, tokenizer, question: str, max_new_tokens: int = 1024) -> str:
+    """Generate response using Llama-3 chat format."""
     system = """You are a helpful mental health counselling assistant, please answer the mental health questions based on the patient's description.
 The assistant gives helpful, comprehensive, and appropriate answers to the user's questions."""
 
@@ -127,7 +140,7 @@ The assistant gives helpful, comprehensive, and appropriate answers to the user'
     return response
 
 
-def evaluate_base_mistral(questions: List[Dict], model, tokenizer) -> List[Dict]:
+def evaluate_base_mistral(questions: List[Dict], model, tokenizer, judge: str = "gpt4") -> List[Dict]:
     """Evaluate base Mistral-7B-Instruct (direct response)."""
     print("\n" + "="*80)
     print("EVALUATING: Base Mistral-7B-Instruct (Direct Response)")
@@ -144,7 +157,7 @@ def evaluate_base_mistral(questions: List[Dict], model, tokenizer) -> List[Dict]
         gen_time = time.time() - start
 
         # Judge
-        eval_result = evaluate_response(question, response, "Base Mistral-7B")
+        eval_result = evaluate_response(question, response, "Base Mistral-7B", judge=judge)
 
         results.append({
             "question": question,
@@ -160,7 +173,7 @@ def evaluate_base_mistral(questions: List[Dict], model, tokenizer) -> List[Dict]
     return results
 
 
-def evaluate_full_pipeline(questions: List[Dict], model, tokenizer) -> List[Dict]:
+def evaluate_full_pipeline(questions: List[Dict], model, tokenizer, judge: str = "gpt4") -> List[Dict]:
     """Evaluate full 3-component pipeline."""
     print("\n" + "="*80)
     print("EVALUATING: Full 3-Component Pipeline")
@@ -185,7 +198,7 @@ def evaluate_full_pipeline(questions: List[Dict], model, tokenizer) -> List[Dict
         gen_time = time.time() - start
 
         # Judge
-        eval_result = evaluate_response(question, response, "Full Pipeline")
+        eval_result = evaluate_response(question, response, "Full Pipeline", judge=judge)
 
         results.append({
             "question": question,
@@ -203,7 +216,7 @@ def evaluate_full_pipeline(questions: List[Dict], model, tokenizer) -> List[Dict
     return results
 
 
-def evaluate_no_clinical(questions: List[Dict], model, tokenizer) -> List[Dict]:
+def evaluate_no_clinical(questions: List[Dict], model, tokenizer, judge: str = "gpt4") -> List[Dict]:
     """Evaluate pipeline without clinical description."""
     print("\n" + "="*80)
     print("EVALUATING: No Clinical Pipeline (Input -> Opinion -> Response)")
@@ -225,7 +238,7 @@ def evaluate_no_clinical(questions: List[Dict], model, tokenizer) -> List[Dict]:
         gen_time = time.time() - start
 
         # Judge
-        eval_result = evaluate_response(question, response, "No Clinical")
+        eval_result = evaluate_response(question, response, "No Clinical", judge=judge)
 
         results.append({
             "question": question,
@@ -242,7 +255,7 @@ def evaluate_no_clinical(questions: List[Dict], model, tokenizer) -> List[Dict]:
     return results
 
 
-def evaluate_no_opinion(questions: List[Dict], model, tokenizer) -> List[Dict]:
+def evaluate_no_opinion(questions: List[Dict], model, tokenizer, judge: str = "gpt4") -> List[Dict]:
     """Evaluate pipeline without professional opinion."""
     print("\n" + "="*80)
     print("EVALUATING: No Opinion Pipeline (Clinical -> Response)")
@@ -264,7 +277,7 @@ def evaluate_no_opinion(questions: List[Dict], model, tokenizer) -> List[Dict]:
         gen_time = time.time() - start
 
         # Judge
-        eval_result = evaluate_response(question, response, "No Opinion")
+        eval_result = evaluate_response(question, response, "No Opinion", judge=judge)
 
         results.append({
             "question": question,
@@ -281,7 +294,7 @@ def evaluate_no_opinion(questions: List[Dict], model, tokenizer) -> List[Dict]:
     return results
 
 
-def evaluate_finetuned_mentalchat(questions: List[Dict]) -> List[Dict]:
+def evaluate_finetuned_mentalchat(questions: List[Dict], judge: str = "gpt4") -> List[Dict]:
     """Evaluate finetuned MentalChat-16K model."""
     print("\n" + "="*80)
     print("EVALUATING: Finetuned MentalChat-16K (Llama-3.2-1B)")
@@ -315,7 +328,7 @@ def evaluate_finetuned_mentalchat(questions: List[Dict]) -> List[Dict]:
         gen_time = time.time() - start
 
         # Judge
-        eval_result = evaluate_response(question, response, "MentalChat-16K")
+        eval_result = evaluate_response(question, response, "MentalChat-16K", judge=judge)
 
         results.append({
             "question": question,
@@ -443,11 +456,7 @@ def print_summary(all_results: Dict[str, List[Dict]]):
     print("SUMMARY: Average Scores Across All Configurations")
     print("="*80)
 
-    # First, run debug on all results
-    for config_name, results in all_results.items():
-        debug_results(results, config_name)
-
-    # Now compute and print summaries
+    # Compute and print summaries
     for config_name, results in all_results.items():
         avg_scores, overall, valid_count, invalid_count = compute_average_scores(results)
 
@@ -501,7 +510,111 @@ def print_summary(all_results: Dict[str, List[Dict]]):
     print("="*80)
 
 
-def main():
+def main(num_questions: int = 10, output: str = 'evaluation_part1_results.json', judge: str = 'gpt4'):
+    """
+    Main evaluation workflow.
+
+    Args:
+        num_questions: Number of questions to evaluate (default: 10)
+        output: Output file for results (default: evaluation_part1_results.json)
+        judge: Which LLM judge to use - 'gpt4', 'gemini', or 'claude' (default: gpt4)
+    """
+    # Auto-detect if running via modal run (check if we're in Modal context)
+    # When you use `modal run`, Modal sets MODAL_IS_REMOTE or we're in a Modal app context
+    is_modal_run = MODAL_AVAILABLE and (
+        os.getenv("MODAL_IS_REMOTE") is not None or
+        hasattr(modal_app, 'is_inside')
+    )
+
+    # Set environment variable for modal_compute decorators
+    if is_modal_run:
+        os.environ["USE_LOCAL"] = "false"
+        print("🌩️  Detected Modal execution - models will run on cloud GPUs")
+    else:
+        os.environ["USE_LOCAL"] = "true"
+        print("🖥️  Local execution - models will run on your machine")
+
+    # Load test questions
+    questions = load_mentalchat_test_set(num_questions)
+
+    # Store all results
+    all_results = {}
+
+    judge_name = {
+        "gpt4": "GPT-4 Turbo",
+        "gemini": "Gemini 1.5 Pro",
+        "claude": "Claude 3.5 Haiku"
+    }.get(judge, "GPT-4 Turbo")
+    print(f"\n🎯 Using {judge_name} as judge\n")
+
+    if is_modal_run and evaluate_mistral_modal_remote is not None:
+        # Modal execution - use remote functions
+        print("☁️  Running evaluations on Modal GPUs...")
+
+        # 1. Base Mistral (on Modal)
+        all_results["Base Mistral-7B"] = evaluate_mistral_modal_remote.remote(questions, judge=judge)
+
+        # For pipelines, we need to load Mistral locally since pipelines aren't decorated yet
+        print("\nLoading Mistral-7B-Instruct locally for pipeline configurations...")
+        model_name = "mistralai/Mistral-7B-Instruct-v0.2"
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        tokenizer.pad_token = tokenizer.eos_token
+
+        model = AutoModelForCausalLM.from_pretrained(
+            model_name,
+            torch_dtype=torch.float16,
+            device_map="auto"
+        )
+        print("Mistral model loaded!")
+    else:
+        # Local execution - load models normally
+        print("🖥️  Running evaluations locally...")
+
+        # Load Mistral model
+        print("\nLoading Mistral-7B-Instruct...")
+        model_name = "mistralai/Mistral-7B-Instruct-v0.2"
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        tokenizer.pad_token = tokenizer.eos_token
+
+        model = AutoModelForCausalLM.from_pretrained(
+            model_name,
+            torch_dtype=torch.float16,
+            device_map="auto"
+        )
+        print("Mistral model loaded!")
+
+        # 1. Base Mistral
+        all_results["Base Mistral-7B"] = evaluate_base_mistral(questions, model, tokenizer, judge=judge)
+
+    # 3. Full pipeline
+    all_results["Full 3-Component Pipeline"] = evaluate_full_pipeline(questions, model, tokenizer, judge=judge)
+
+    # 4. No clinical
+    all_results["No Clinical Pipeline"] = evaluate_no_clinical(questions, model, tokenizer, judge=judge)
+
+    # 5. No opinion
+    all_results["No Opinion Pipeline"] = evaluate_no_opinion(questions, model, tokenizer, judge=judge)
+
+    # Clean up Mistral model before loading finetuned
+    del model
+    del tokenizer
+    torch.cuda.empty_cache()
+
+    # 6. Finetuned MentalChat
+    all_results["Finetuned MentalChat-16K"] = evaluate_finetuned_mentalchat(questions, judge=judge)
+
+    # Print summary
+    print_summary(all_results)
+
+    # Save results
+    output_path = Path(output)
+    with open(output_path, 'w') as f:
+        json.dump(all_results, f, indent=2)
+
+    print(f"\n✅ Results saved to {output_path}")
+
+
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='Evaluate models and pipeline configurations on MentalChat16K test set'
     )
@@ -517,58 +630,32 @@ def main():
         default='evaluation_part1_results.json',
         help='Output file for results (default: evaluation_part1_results.json)'
     )
-
-    args = parser.parse_args()
-
-    # Load test questions
-    questions = load_mentalchat_test_set(args.num_questions)
-
-    # Load Mistral model (used for all pipeline configurations)
-    print("\nLoading Mistral-7B-Instruct...")
-    model_name = "mistralai/Mistral-7B-Instruct-v0.2"
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    tokenizer.pad_token = tokenizer.eos_token
-
-    model = AutoModelForCausalLM.from_pretrained(
-        model_name,
-        torch_dtype=torch.float16,
-        device_map="auto"
+    parser.add_argument(
+        '--judge',
+        type=str,
+        default='gpt4',
+        choices=['gpt4', 'gemini', 'claude'],
+        help='Which LLM judge to use: gpt4, gemini, or claude (default: gpt4)'
     )
-    print("Mistral model loaded!")
-
-    # Store all results
-    all_results = {}
-
-    # 1. Base Mistral
-    all_results["Base Mistral-7B"] = evaluate_base_mistral(questions, model, tokenizer)
-
-    # 2. Full pipeline
-    all_results["Full 3-Component Pipeline"] = evaluate_full_pipeline(questions, model, tokenizer)
-
-    # 3. No clinical
-    all_results["No Clinical Pipeline"] = evaluate_no_clinical(questions, model, tokenizer)
-
-    # 4. No opinion
-    all_results["No Opinion Pipeline"] = evaluate_no_opinion(questions, model, tokenizer)
-
-    # Clean up Mistral model before loading finetuned
-    del model
-    del tokenizer
-    torch.cuda.empty_cache()
-
-    # 5. Finetuned MentalChat
-    all_results["Finetuned MentalChat-16K"] = evaluate_finetuned_mentalchat(questions)
-
-    # Print summary
-    print_summary(all_results)
-
-    # Save results
-    output_path = Path(args.output)
-    with open(output_path, 'w') as f:
-        json.dump(all_results, f, indent=2)
-
-    print(f"\n✅ Results saved to {output_path}")
+    args = parser.parse_args()
+    main(num_questions=args.num_questions, output=args.output, judge=args.judge)
 
 
-if __name__ == "__main__":
-    main()
+# Modal entrypoint (allows: modal run evaluation_part1.py --num-questions 10)
+if MODAL_AVAILABLE and modal_app is not None:
+    @modal_app.local_entrypoint()
+    def modal_main(
+        num_questions: int = 10,
+        output: str = 'evaluation_part1_results.json',
+        judge: str = 'gpt4'
+    ):
+        """
+        Modal entrypoint for running evaluations.
+        Base model evaluations run on Modal GPUs, pipelines run locally.
+
+        Args:
+            num_questions: Number of questions to evaluate (default: 10)
+            output: Output file for results (default: evaluation_part1_results.json)
+            judge: Which LLM judge to use - gpt4, gemini, or claude (default: gpt4)
+        """
+        main(num_questions=num_questions, output=output, judge=judge)
