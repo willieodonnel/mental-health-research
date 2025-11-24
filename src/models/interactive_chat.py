@@ -23,7 +23,7 @@ logging.getLogger("transformers").setLevel(logging.ERROR)
 
 # Import the main pipeline
 sys.path.insert(0, str(Path(__file__).parent))
-from main_pipeline import load_model, generate
+from src.models.main_pipeline import load_model, generate
 
 
 class ConversationMemory:

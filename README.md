@@ -1,12 +1,13 @@
 # Mental Health Support Pipeline
 
-A local mental health inference system using **Mistral-7B-Instruct** on RTX 5080 GPU. Generates empathetic, professional counseling responses entirely on your local hardware.
+A mental health inference system using **Mistral-7B-Instruct** with local or cloud GPU support. Generates empathetic, professional counseling responses with optional multi-LLM evaluation framework.
 
-**IMPORTANT**:
-- ❌ Does **NOT** use ChatGPT/GPT-4 for inference
-- ✅ Uses **Mistral-7B-Instruct** running locally on RTX 5080
-- ✅ GPT-4 is **ONLY** used optionally as a judge for evaluation (NOT for generating responses)
-- ✅ 100% private - all inference runs on your hardware
+**Key Features**:
+- **Local-first inference**: Mistral-7B-Instruct runs on local GPU (tested on RTX 5080)
+- **Cloud GPU option**: Deploy on Modal (A10G, A100, H100) for evaluation
+- **Privacy-preserving**: All inference can run completely locally
+- **Multi-judge evaluation**: Optional evaluation using GPT-4, Gemini, or Claude as judges
+- **Binary question judging**: Objective YES/NO evaluation framework for reproducible scoring
 
 ## Table of Contents
 1. [Overview](#overview)
@@ -27,22 +28,23 @@ A local mental health inference system using **Mistral-7B-Instruct** on RTX 5080
 
 ## Overview
 
-This codebase implements a **mental health support inference pipeline** that uses **Mistral-7B-Instruct** running locally on your RTX 5080 GPU to generate empathetic, professional, and evidence-based counseling responses.
+This codebase implements a **mental health support inference pipeline** using **Mistral-7B-Instruct** to generate empathetic, professional, and evidence-based counseling responses.
 
 ### Key Features
-- **Local Inference**: Mistral-7B-Instruct running on RTX 5080 (NO ChatGPT/GPT-4 for inference)
-- **RTX 5080 Optimized**: Full GPU acceleration with PyTorch nightly
-- **GPT-4 Judge**: Optional evaluation using GPT-4 as an impartial judge (evaluation only, NOT inference)
+- **Local Inference**: Mistral-7B-Instruct running on local GPU (RTX 5080 or similar)
+- **GPU Flexibility**: Supports local GPU (RTX 30/40/50 series) or cloud GPU (Modal)
+- **Multi-Judge Evaluation**: Optional evaluation using GPT-4, Gemini, or Claude as impartial judges
 - **Standardized Evaluation**: Uses MentalChat16K research methodology (7 metrics)
+- **Binary Question Framework**: Objective YES/NO question judging for reproducibility
 - **Interactive & Batch Processing**: Flexible usage modes
 - **Ablation Testing**: Compare different pipeline configurations
-- **Fully Private**: All inference runs locally on your hardware
+- **Privacy-First**: All inference can run locally without cloud dependencies
 
 ### Performance Highlights
 - **Overall Score**: ~9.0/10 on MentalChat16K metrics (20% improvement over baseline)
-- **RTX 5080 Speed**: 40-60 tokens/second with FP16 precision
-- **VRAM Usage**: ~3.5GB (4-bit) to ~14GB (FP16)
-- **One test sample achieved a perfect 10/10 score across all 7 metrics**
+- **Inference Speed**: 40-60 tokens/second with FP16 precision (RTX 5080)
+- **VRAM Usage**: ~3.5GB (4-bit quantization) to ~14GB (FP16)
+- **Peak Performance**: Some samples achieve perfect 10/10 scores across all 7 metrics
 
 ### Recent Improvements
 
@@ -57,18 +59,13 @@ This codebase implements a **mental health support inference pipeline** that use
 
 ## How It Works
 
-### Main Inference Architecture (Recommended)
+### Main Inference Architecture
 
-**This pipeline uses ONLY Mistral-7B-Instruct for inference** running locally on your RTX 5080 GPU:
-- ❌ **NO ChatGPT/GPT-4** for generating responses
-- ✅ **Mistral-7B-Instruct** handles all inference
-- ✅ **GPT-4** is ONLY used as a judge for evaluation (optional)
-
-The main inference pipeline is a **single-stage process** using Mistral-7B-Instruct with a carefully crafted system prompt that incorporates counseling best practices.
+The inference pipeline uses **Mistral-7B-Instruct** for generating responses. The main architecture is a **single-stage process** using a carefully crafted system prompt that incorporates counseling best practices.
 
 **Inference Flow**:
 ```
-User Input → Mistral-7B-Instruct (RTX 5080) → Mental Health Counseling Response
+User Input → Mistral-7B-Instruct (Local or Cloud GPU) → Mental Health Counseling Response
 ```
 
 The model uses a single system prompt that includes:
@@ -101,30 +98,30 @@ Final Response
 
 ### Evaluation Process (Optional)
 
-When using GPT-4 as judge for evaluation:
+When using LLM judges for evaluation:
 ```
 User Input
     ↓
 [Mistral-7B-Instruct] → Response
     ↓
-[GPT-4 Judge] → Scores (1-10 on 7 metrics)
+[LLM Judge: GPT-4/Gemini/Claude] → Scores (1-10 on 7 metrics)
     ↓
-Results (JSONL + CSV)
+Results (JSON/JSONL)
 ```
 
 ---
 
 ## Architecture
 
-### PRIMARY: Local Inference (Mistral-7B-Instruct on RTX 5080)
+### Primary Inference Pipeline
 
-**This is the main inference pipeline used in this project.**
+The main inference pipeline for generating responses:
 
 ```
 User Input
     ↓
-[Mistral-7B-Instruct on RTX 5080]
-  - PyTorch Nightly (CUDA 12.8)
+[Mistral-7B-Instruct on GPU]
+  - PyTorch with CUDA support
   - FP16 precision or 4-bit quantization
   - System prompt with counseling guidelines
     ↓
@@ -147,16 +144,22 @@ Final Response (Mental Health Counseling)
 
 ### Prerequisites
 - **Python**: 3.8 or higher
-- **RTX 5080**: 16GB VRAM (for local inference)
-- **CUDA**: 12.8 or higher
-- **PyTorch**: Nightly build (required for RTX 5080)
+- **GPU**: NVIDIA GPU with 16GB+ VRAM recommended (RTX 30/40/50 series)
+  - RTX 5080 users: Requires PyTorch nightly (Blackwell architecture support)
+  - Other GPUs: Stable PyTorch release works fine
+- **CUDA**: 11.8+ (12.8+ for RTX 5080)
+- **Modal** (optional): For cloud GPU deployment
 
-### Step 1: Install PyTorch Nightly (RTX 5080 Required)
+### Step 1: Install PyTorch
 
-The RTX 5080 uses **Blackwell architecture** (compute capability sm_120), which is only supported in PyTorch nightly builds.
-
+**For RTX 5080 users** - Requires PyTorch nightly (Blackwell architecture):
 ```bash
 pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128
+```
+
+**For other GPUs** - Stable PyTorch works fine:
+```bash
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 ```
 
 ### Step 2: Install Dependencies
@@ -193,7 +196,7 @@ ANTHROPIC_API_KEY=your-anthropic-key-here
 
 ### Step 4: Setup Modal for Cloud GPU (Optional)
 
-If you want to run evaluations on cloud GPUs instead of your RTX 5080:
+To run evaluations on cloud GPUs:
 
 ```bash
 # Install Modal
@@ -218,9 +221,9 @@ modal token new
 
 ## Quick Start
 
-### Local Inference (Mistral-7B on RTX 5080)
+### Local Inference
 
-**No API key needed for inference!**
+**No API key needed for local inference!**
 
 ```bash
 # Quick demo - Simple inference testing
@@ -1114,3 +1117,7 @@ Based on the evaluation methodology from:
 - PyTorch Nightly: https://pytorch.org/get-started/locally/
 - Transformers: https://huggingface.co/docs/transformers
 - LangChain: https://python.langchain.com/
+
+---
+
+*This README was generated with assistance from Claude (Anthropic)*

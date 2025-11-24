@@ -20,14 +20,14 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 sys.path.insert(0, str(Path(__file__).parent))
 
 # Import centralized judging functions
-from judging import (
+from evaluation.judging import (
     evaluate_response,
     print_comparison_results,
     METRICS
 )
 
 # Import pipeline components
-from pipeline_pieces import (
+from src.models.pipeline_pieces import (
     run_clinical_description,
     run_professional_opinion,
     run_final_response
