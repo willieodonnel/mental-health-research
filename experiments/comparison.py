@@ -14,11 +14,11 @@ from pathlib import Path
 
 # Import local modules
 sys.path.insert(0, str(Path(__file__).parent))
-from finetuned_mentalchat_model import load_model as load_finetuned, generate as generate_finetuned
-from main_pipeline import run_pipeline
+from src.models.finetuned_mentalchat_model import load_model as load_finetuned, generate as generate_finetuned
+from src.models.main_pipeline import run_pipeline
 
 # Import centralized judging functions
-from judging import (
+from evaluation.judging import (
     evaluate_response,
     print_comparison_results
 )

@@ -18,7 +18,7 @@ from typing import Dict, List, Any
 from datetime import datetime
 
 # Import pipeline and memory components
-from main_pipeline import load_model, generate
+from src.models.main_pipeline import load_model, generate
 
 # Optional: Import judging for GPT-4o mini evaluation
 try:

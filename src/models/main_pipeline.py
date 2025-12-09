@@ -9,10 +9,12 @@ Components:
 
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
+from nnsight import LanguageModel
 
 
-def load_model():
+def load_model(interp=False):
     """Load Mistral model once for all components."""
+
     model_name = "mistralai/Mistral-7B-Instruct-v0.2"
 
     print("Loading model for pipeline...")
@@ -21,12 +23,24 @@ def load_model():
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     tokenizer.pad_token = tokenizer.eos_token
 
-    # Load model
-    model = AutoModelForCausalLM.from_pretrained(
-        model_name,
-        torch_dtype=torch.float16,
-        device_map="auto"
-    )
+    print("Loading model for pipeline...")
+
+    if interp == False:
+
+        # Load model
+        model = AutoModelForCausalLM.from_pretrained(
+            model_name,
+            torch_dtype=torch.float16,
+            device_map="auto"
+        )
+    else:
+
+        # Load model
+        model = LanguageModel(
+            model_name,
+            torch_dtype=torch.float16,
+            device_map="auto"
+        )
 
     print("Model loaded successfully!")
     return model, tokenizer
@@ -60,6 +74,30 @@ def generate(model, tokenizer, prompt, max_new_tokens=512):
         response = response.split("[/INST]")[-1].strip()
 
     return response
+
+
+def generate_with_activations(model: LanguageModel, tokenizer, prompt):
+    if not isinstance(model, LanguageModel):
+        raise TypeError(f"Expected LanguageModel object for model, make sure interp=True in load_model!")
+    formatted_prompt = f"[INST] {prompt} [/INST]"
+    outputs = []
+
+    # Tokenize
+    inputs = tokenizer(formatted_prompt, return_tensors="pt", truncation=False)
+    inputs = {k: v.to(model.device) for k, v in inputs.items()}
+    layers = model.model.layers
+    with model.trace() as tracer:
+        with tracer.invoke(formatted_prompt) as invoker:
+            input_tokens = invoker.inputs.save()
+            for layer_idx, layer in enumerate(layers):
+
+                # we obtain layer output by passing normalized hidden state
+                layer_output = model.lm_head(model.model.norm(layer.output[0]))
+                #top_tokens = layer_output.argmax(dim=-1)[-10:-1]
+                top_token = layer_output.argmax(dim=-1)[-1]
+                layer_result = {'layer_idx': layer_idx, 'token': tokenizer.decode(top_token)}
+                outputs.append(layer_result)          
+    return outputs
 
 
 def run_pipeline(user_input):
