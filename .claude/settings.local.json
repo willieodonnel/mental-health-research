@@ -9,7 +9,8 @@
       "Bash(.venv/Scripts/pip.exe:*)",
       "Bash(cp:*)",
       "Bash(curl:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": []

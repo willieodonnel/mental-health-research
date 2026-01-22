@@ -19,18 +19,13 @@ from datetime import datetime
 
 # Import pipeline and memory components
 from src.models.main_pipeline import load_model, generate
+from langchain_openai import ChatOpenAI
+import os
+from dotenv import load_dotenv
+load_dotenv()
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+JUDGING_AVAILABLE = OPENAI_API_KEY is not None
 
-# Optional: Import judging for GPT-4o mini evaluation
-try:
-    from langchain_openai import ChatOpenAI
-    import os
-    from dotenv import load_dotenv
-    load_dotenv()
-    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-    JUDGING_AVAILABLE = OPENAI_API_KEY is not None
-except ImportError:
-    JUDGING_AVAILABLE = False
-    OPENAI_API_KEY = None
 
 
 class ConversationMemory:
